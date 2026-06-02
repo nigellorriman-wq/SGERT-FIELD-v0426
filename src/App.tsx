@@ -1742,11 +1742,10 @@ const App: React.FC = () => {
   const lidarFetchRef = useRef<number>(0);
 
   useEffect(() => {
-    if ((!isFollowing || isPlanningSession) && mapCenter) {
+    if (isPlanningSession && mapCenter) {
       const timer = setTimeout(async () => {
         const alt = await fetchLidarElevation(mapCenter.lat, mapCenter.lng);
         setPos(prev => {
-          if (isFollowing && !isPlanningSession) return prev;
           // Only update if moved more than 0.2m to avoid jitter
           if (prev && L.latLng(prev.lat, prev.lng).distanceTo(L.latLng(mapCenter.lat, mapCenter.lng)) < 0.2 && prev.alt === alt) return prev;
           
@@ -1848,8 +1847,8 @@ const App: React.FC = () => {
 
     const handleUpdate = (p: GeolocationPosition) => {
       setPos(prev => {
-        // CRITICAL: If we are not following, or in a planning session, do not let GNSS background updates overwrite manual/planning position
-        if ((!isFollowing || isPlanningSession) && prev) return prev;
+        // CRITICAL: If we are in a planning session, do not let GNSS background updates overwrite manual/planning position
+        if (isPlanningSession && prev) return prev;
 
         const newPos: GeoPoint = { 
           lat: p.coords.latitude, 
@@ -1952,16 +1951,16 @@ const App: React.FC = () => {
     const watch = navigator.geolocation.watchPosition(
       async (p) => {
         setGpsError(null);
-        if (isFollowing && !isPlanningSession) {
+        if (!isPlanningSession) {
           handleUpdate(p);
-          // Always try to fetch LiDAR elevation when following to improve GNSS altitude
+          // Always try to fetch LiDAR elevation to improve GNSS altitude
           const currentTs = Date.now();
           lidarFetchRef.current = currentTs;
           const lidarAlt = await fetchLidarElevation(p.coords.latitude, p.coords.longitude);
           if (lidarFetchRef.current === currentTs && lidarAlt !== null) {
             const LIDAR_ACCURACY = 0.2;
             setPos(prev => {
-              if (!prev || prev.timestamp > currentTs || !isFollowing) return prev;
+              if (!prev || prev.timestamp > currentTs) return prev;
               if (prev.altAccuracy === null || prev.altAccuracy > LIDAR_ACCURACY) {
                 return { ...prev, alt: lidarAlt, altAccuracy: LIDAR_ACCURACY, source: 'LiDAR' };
               }
