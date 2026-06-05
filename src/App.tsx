@@ -2086,7 +2086,7 @@ const App: React.FC = () => {
         const last = prev[prev.length - 1];
         const dist = L.latLng(last.lat, last.lng).distanceTo(L.latLng(pos.lat, pos.lng));
         
-        // Only update the last few points if they lack altitude
+        // Only update the last few points if they lack altitude or specific sensor altitudes
         // Iterating over the entire history on every GPS tick is too expensive
         let changed = false;
         const lookback = Math.min(prev.length, 5);
@@ -2094,10 +2094,32 @@ const App: React.FC = () => {
         
         for (let i = prev.length - 1; i >= prev.length - lookback; i--) {
           const p = updated[i];
-          if (p.alt === null && pos.alt !== null) {
-            const d = L.latLng(p.lat, p.lng).distanceTo(L.latLng(pos.lat, pos.lng));
-            if (d < 10) {
-              updated[i] = { ...p, alt: pos.alt, altAccuracy: pos.altAccuracy, source: pos.source };
+          const d = L.latLng(p.lat, p.lng).distanceTo(L.latLng(pos.lat, pos.lng));
+          if (d < 10) {
+            let itemChanged = false;
+            const updatedItem = { ...p };
+            
+            if (updatedItem.alt === null && pos.alt !== null) {
+              updatedItem.alt = pos.alt;
+              updatedItem.altAccuracy = pos.altAccuracy;
+              updatedItem.source = pos.source;
+              itemChanged = true;
+            }
+            if ((updatedItem.alt_baro === null || updatedItem.alt_baro === undefined) && pos.alt_baro !== null && pos.alt_baro !== undefined) {
+              updatedItem.alt_baro = pos.alt_baro;
+              itemChanged = true;
+            }
+            if ((updatedItem.alt_lidar === null || updatedItem.alt_lidar === undefined) && pos.alt_lidar !== null && pos.alt_lidar !== undefined) {
+              updatedItem.alt_lidar = pos.alt_lidar;
+              itemChanged = true;
+            }
+            if ((updatedItem.alt_gnss === null || updatedItem.alt_gnss === undefined) && pos.alt_gnss !== null && pos.alt_gnss !== undefined) {
+              updatedItem.alt_gnss = pos.alt_gnss;
+              itemChanged = true;
+            }
+            
+            if (itemChanged) {
+              updated[i] = updatedItem;
               changed = true;
             }
           }
@@ -3112,7 +3134,7 @@ const App: React.FC = () => {
                               {effectiveMetrics.baroDiffStr === 'N/A' ? 'N/A' : (effectiveMetrics.baroDiffStr === '-' ? '-' : `${effectiveMetrics.baroDiffStr}${(units === 'Yards' ? 'ft' : 'm')}`)}
                             </span>
                           </div>
-                          <div className={`flex gap-1 justify-between items-center w-full px-2 ${(lidarStatus !== 'available' || lidarLayerLoading) ? 'animate-pulse opacity-75' : ''}`}>
+                          <div className={`flex gap-1 justify-between items-center w-full px-2 ${(!trkActive && (lidarStatus !== 'available' || lidarLayerLoading)) ? 'animate-pulse opacity-75' : ''}`}>
                             <span className="text-[10px] font-extrabold tracking-tight text-yellow-400 uppercase">LIDAR:</span>
                             <span className="text-xs font-black text-slate-100 tabular-nums">
                               {effectiveMetrics.lidarDiffStr === 'N/A' ? 'N/A' : (effectiveMetrics.lidarDiffStr === '-' ? '-' : `${effectiveMetrics.lidarDiffStr}${(units === 'Yards' ? 'ft' : 'm')}`)}
