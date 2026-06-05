@@ -2260,6 +2260,7 @@ const App: React.FC = () => {
       const tAlt = targetPoint.alt_gnss !== undefined ? targetPoint.alt_gnss : (targetPoint.source === 'GPS' ? targetPoint.alt : null);
       if (sAlt === null || sAlt === undefined || tAlt === null || tAlt === undefined) return "N/A";
       const diff = (tAlt - sAlt) * elevMult;
+      if (Math.abs(diff) > 999) return "-";
       return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
     })();
 
@@ -2269,6 +2270,7 @@ const App: React.FC = () => {
       const tAlt = targetPoint.alt_baro !== undefined ? targetPoint.alt_baro : (targetPoint.source === 'Barometric' ? targetPoint.alt : null);
       if (sAlt === null || sAlt === undefined || tAlt === null || tAlt === undefined) return "N/A";
       const diff = (tAlt - sAlt) * elevMult;
+      if (Math.abs(diff) > 999) return "-";
       return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
     })();
 
@@ -2278,6 +2280,7 @@ const App: React.FC = () => {
       const tAlt = targetPoint.alt_lidar !== undefined ? targetPoint.alt_lidar : (['LiDAR', 'Manual/LiDAR'].includes(targetPoint.source || '') ? targetPoint.alt : null);
       if (sAlt === null || sAlt === undefined || tAlt === null || tAlt === undefined) return "N/A";
       const diff = (tAlt - sAlt) * elevMult;
+      if (Math.abs(diff) > 999) return "-";
       return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
     })();
 
@@ -3078,20 +3081,26 @@ const App: React.FC = () => {
                             })()}
                         </div>
                       </div>
-                      <div className="col-span-1 text-center border-l border-white/10 flex flex-col items-center justify-center h-full">
+                      <div className="col-span-1 text-center border-l border-white/10 flex flex-col items-center">
                         <span className="text-[10px] font-bold text-white/40 uppercase block mb-2 leading-none">ELEVATION</span>
-                        <div className="flex flex-col gap-1 w-full text-[10px] items-center my-0.5">
+                        <div className="flex flex-col gap-1.5 w-full items-center my-1">
                           <div className="flex gap-1 justify-between items-center w-full px-2">
-                            <span className="text-[8px] font-black tracking-tighter text-rose-500 uppercase">GNSS:</span>
-                            <span className="font-bold text-slate-100 tabular-nums">{effectiveMetrics.gnssDiffStr !== 'N/A' ? `${effectiveMetrics.gnssDiffStr}${(units === 'Yards' ? 'ft' : 'm')}` : 'N/A'}</span>
+                            <span className="text-[10px] font-extrabold tracking-tight text-rose-500 uppercase">GNSS:</span>
+                            <span className="text-xs font-black text-slate-100 tabular-nums">
+                              {effectiveMetrics.gnssDiffStr === 'N/A' ? 'N/A' : (effectiveMetrics.gnssDiffStr === '-' ? '-' : `${effectiveMetrics.gnssDiffStr}${(units === 'Yards' ? 'ft' : 'm')}`)}
+                            </span>
                           </div>
                           <div className="flex gap-1 justify-between items-center w-full px-2">
-                            <span className="text-[8px] font-black tracking-tighter text-blue-400 uppercase">BARO:</span>
-                            <span className="font-bold text-slate-100 tabular-nums">{effectiveMetrics.baroDiffStr !== 'N/A' ? `${effectiveMetrics.baroDiffStr}${(units === 'Yards' ? 'ft' : 'm')}` : 'N/A'}</span>
+                            <span className="text-[10px] font-extrabold tracking-tight text-blue-400 uppercase">BARO:</span>
+                            <span className="text-xs font-black text-slate-100 tabular-nums">
+                              {effectiveMetrics.baroDiffStr === 'N/A' ? 'N/A' : (effectiveMetrics.baroDiffStr === '-' ? '-' : `${effectiveMetrics.baroDiffStr}${(units === 'Yards' ? 'ft' : 'm')}`)}
+                            </span>
                           </div>
                           <div className="flex gap-1 justify-between items-center w-full px-2">
-                            <span className="text-[8px] font-black tracking-tighter text-yellow-400 uppercase">LIDAR:</span>
-                            <span className="font-bold text-slate-100 tabular-nums">{effectiveMetrics.lidarDiffStr !== 'N/A' ? `${effectiveMetrics.lidarDiffStr}${(units === 'Yards' ? 'ft' : 'm')}` : 'N/A'}</span>
+                            <span className="text-[10px] font-extrabold tracking-tight text-yellow-400 uppercase">LIDAR:</span>
+                            <span className="text-xs font-black text-slate-100 tabular-nums">
+                              {effectiveMetrics.lidarDiffStr === 'N/A' ? 'N/A' : (effectiveMetrics.lidarDiffStr === '-' ? '-' : `${effectiveMetrics.lidarDiffStr}${(units === 'Yards' ? 'ft' : 'm')}`)}
+                            </span>
                           </div>
                         </div>
                       </div>
