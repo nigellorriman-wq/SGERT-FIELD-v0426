@@ -2256,8 +2256,8 @@ const App: React.FC = () => {
 
     const gnssDiffStr = (() => {
       if (!startPoint || !targetPoint) return "N/A";
-      const sAlt = startPoint.alt_gnss !== undefined ? startPoint.alt_gnss : (startPoint.source === 'GPS' ? startPoint.alt : null);
-      const tAlt = targetPoint.alt_gnss !== undefined ? targetPoint.alt_gnss : (targetPoint.source === 'GPS' ? targetPoint.alt : null);
+      const sAlt = (startPoint.alt_gnss !== undefined && startPoint.alt_gnss !== null) ? startPoint.alt_gnss : (startPoint.source === 'GPS' ? startPoint.alt : null);
+      const tAlt = (targetPoint.alt_gnss !== undefined && targetPoint.alt_gnss !== null) ? targetPoint.alt_gnss : (targetPoint.source === 'GPS' ? targetPoint.alt : null);
       if (sAlt === null || sAlt === undefined || tAlt === null || tAlt === undefined) return "N/A";
       const diff = (tAlt - sAlt) * elevMult;
       if (Math.abs(diff) > 999) return "-";
@@ -2266,8 +2266,8 @@ const App: React.FC = () => {
 
     const baroDiffStr = (() => {
       if (!startPoint || !targetPoint) return "N/A";
-      const sAlt = startPoint.alt_baro !== undefined ? startPoint.alt_baro : (startPoint.source === 'Barometric' ? startPoint.alt : null);
-      const tAlt = targetPoint.alt_baro !== undefined ? targetPoint.alt_baro : (targetPoint.source === 'Barometric' ? targetPoint.alt : null);
+      const sAlt = (startPoint.alt_baro !== undefined && startPoint.alt_baro !== null) ? startPoint.alt_baro : (startPoint.source === 'Barometric' ? startPoint.alt : null);
+      const tAlt = (targetPoint.alt_baro !== undefined && targetPoint.alt_baro !== null) ? targetPoint.alt_baro : (targetPoint.source === 'Barometric' ? targetPoint.alt : null);
       if (sAlt === null || sAlt === undefined || tAlt === null || tAlt === undefined) return "N/A";
       const diff = (tAlt - sAlt) * elevMult;
       if (Math.abs(diff) > 999) return "-";
@@ -2276,8 +2276,8 @@ const App: React.FC = () => {
 
     const lidarDiffStr = (() => {
       if (!startPoint || !targetPoint) return "N/A";
-      const sAlt = startPoint.alt_lidar !== undefined ? startPoint.alt_lidar : (['LiDAR', 'Manual/LiDAR'].includes(startPoint.source || '') ? startPoint.alt : null);
-      const tAlt = targetPoint.alt_lidar !== undefined ? targetPoint.alt_lidar : (['LiDAR', 'Manual/LiDAR'].includes(targetPoint.source || '') ? targetPoint.alt : null);
+      const sAlt = (startPoint.alt_lidar !== undefined && startPoint.alt_lidar !== null) ? startPoint.alt_lidar : (['LiDAR', 'Manual/LiDAR'].includes(startPoint.source || '') ? startPoint.alt : null);
+      const tAlt = (targetPoint.alt_lidar !== undefined && targetPoint.alt_lidar !== null) ? targetPoint.alt_lidar : (['LiDAR', 'Manual/LiDAR'].includes(targetPoint.source || '') ? targetPoint.alt : null);
       if (sAlt === null || sAlt === undefined || tAlt === null || tAlt === undefined) return "N/A";
       const diff = (tAlt - sAlt) * elevMult;
       if (Math.abs(diff) > 999) return "-";
@@ -2330,7 +2330,15 @@ const App: React.FC = () => {
   const handleConfirmPivot = useCallback(async () => {
     if (pos && pendingPivotType) { 
       const alt = isPlanningSession ? await fetchLidarElevation(pos.lat, pos.lng) : pos.alt;
-      const pointWithAlt = { ...pos, alt, altAccuracy: alt !== null ? 0.2 : null, source: isPlanningSession ? 'Manual/LiDAR' : pos.source };
+      const pointWithAlt = { 
+        ...pos, 
+        alt, 
+        altAccuracy: alt !== null ? 0.2 : null, 
+        source: isPlanningSession ? 'Manual/LiDAR' : pos.source,
+        alt_lidar: isPlanningSession ? alt : (pos.alt_lidar ?? (['LiDAR', 'Manual/LiDAR'].includes(pos.source || '') ? pos.alt : null)),
+        alt_baro: pos.alt_baro,
+        alt_gnss: pos.alt_gnss
+      };
       setCurrentPivots(prev => [...prev, { point: pointWithAlt, type: pendingPivotType }]); 
       setTrkPoints(prev => [...prev, pointWithAlt]); 
       setPendingPivotType(null); 
@@ -2342,7 +2350,15 @@ const App: React.FC = () => {
     if (!pos) return;
     // Fetch latest LiDAR elevation for the recorded point
     const alt = await fetchLidarElevation(pos.lat, pos.lng);
-    const pointWithAlt: GeoPoint = { ...pos, alt, altAccuracy: alt !== null ? 0.2 : null, source: 'Manual/LiDAR' };
+    const pointWithAlt: GeoPoint = { 
+      ...pos, 
+      alt, 
+      altAccuracy: alt !== null ? 0.2 : null, 
+      source: 'Manual/LiDAR',
+      alt_lidar: alt,
+      alt_baro: pos.alt_baro,
+      alt_gnss: pos.alt_gnss
+    };
     setTrkPoints(prev => [...prev, pointWithAlt]);
   }, [pos]);
 
@@ -3096,7 +3112,7 @@ const App: React.FC = () => {
                               {effectiveMetrics.baroDiffStr === 'N/A' ? 'N/A' : (effectiveMetrics.baroDiffStr === '-' ? '-' : `${effectiveMetrics.baroDiffStr}${(units === 'Yards' ? 'ft' : 'm')}`)}
                             </span>
                           </div>
-                          <div className="flex gap-1 justify-between items-center w-full px-2">
+                          <div className={`flex gap-1 justify-between items-center w-full px-2 ${(lidarStatus !== 'available' || lidarLayerLoading) ? 'animate-pulse opacity-75' : ''}`}>
                             <span className="text-[10px] font-extrabold tracking-tight text-yellow-400 uppercase">LIDAR:</span>
                             <span className="text-xs font-black text-slate-100 tabular-nums">
                               {effectiveMetrics.lidarDiffStr === 'N/A' ? 'N/A' : (effectiveMetrics.lidarDiffStr === '-' ? '-' : `${effectiveMetrics.lidarDiffStr}${(units === 'Yards' ? 'ft' : 'm')}`)}
