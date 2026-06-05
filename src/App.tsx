@@ -1693,6 +1693,11 @@ const App: React.FC = () => {
   const [lidarDebug, setLidarDebug] = useState<{ url: string, response: any, coords: { lat: number, lng: number } | null }>({ url: '', response: null, coords: null });
   const [showLidarDebug, setShowLidarDebug] = useState(false);
   const [lidarLayerLoading, setLidarLayerLoading] = useState(false);
+  const [baroStatus, setBaroStatus] = useState<'disabled' | 'unsupported' | 'initializing' | 'running' | 'error' | 'reading'>('initializing');
+  const [baroError, setBaroError] = useState<string | null>(null);
+  const [rawPressure, setRawPressure] = useState<number | null>(null);
+  const [calibratedBaroAlt, setCalibratedBaroAlt] = useState<number | null>(null);
+  const rawBaroAltRef = useRef<number | null>(null);
   const [reportGreens, setReportGreens] = useState<SavedRecord[]>([]);
   const [reportFileName, setReportFileName] = useState("");
   // Removed planningReport and Terrain Manager states for Field Edition stability
@@ -1714,20 +1719,32 @@ const App: React.FC = () => {
         sensor.addEventListener('reading', () => {
           const pressure = sensor.pressure;
           if (typeof pressure === 'number' && !isNaN(pressure)) {
-            const rawBaroAlt = 44330 * (1 - Math.pow(pressure / 1013.25, 1 / 5.255));
+            setRawPressure(pressure);
+            setBaroStatus('reading');
+            setBaroError(null);
             
+            const rawBaroAlt = 44330 * (1 - Math.pow(pressure / 1013.25, 1 / 5.255));
+            rawBaroAltRef.current = rawBaroAlt;
+            
+            // Calculate a temporary calibrated alt even if pos is not yet established, for display purposes in diagnostics
+            const offset = baroOffsetRef.current ?? 0;
+            setCalibratedBaroAlt(rawBaroAlt + offset);
+
             setPos(prev => {
               if (!prev) return null;
               
               if (baroOffsetRef.current === null) {
-                if (prev.alt !== null) {
+                if (prev.alt !== null && prev.alt !== undefined) {
                   baroOffsetRef.current = prev.alt - rawBaroAlt;
                 } else {
                   baroOffsetRef.current = 0;
                 }
               }
               
-              const calibratedAlt = rawBaroAlt + (baroOffsetRef.current ?? 0);
+              const currentOffset = baroOffsetRef.current;
+              const calibratedAlt = rawBaroAlt + currentOffset;
+              setCalibratedBaroAlt(calibratedAlt);
+
               const hasLidar = prev.source === 'LiDAR' || prev.source === 'Manual/LiDAR';
               return {
                 ...prev,
@@ -1742,15 +1759,21 @@ const App: React.FC = () => {
         
         sensor.addEventListener('error', (event: any) => {
           console.warn('[Pressure/Barometer] sensor error:', event.error);
+          setBaroStatus('error');
+          setBaroError(event.error ? `${event.error.name || 'SensorError'}: ${event.error.message || 'Access to physical sensor was denied or failed'}` : 'Failed to retrieve pressure readings. Device orientation or motion permission may be needed.');
         });
         
         sensor.start();
+        setBaroStatus('running');
         console.log('[Pressure/Barometer] sensor started successfully');
-      } catch (err) {
+      } catch (err: any) {
         console.warn('[Pressure/Barometer] initialization failed:', err);
+        setBaroStatus('error');
+        setBaroError(err ? (err.message || String(err)) : 'Failed to instantiate the browser sensor classes');
       }
     } else {
       console.log('[Pressure/Barometer] sensor is not supported on this device/browser');
+      setBaroStatus('unsupported');
     }
     
     return () => {
@@ -1877,7 +1900,21 @@ const App: React.FC = () => {
         if (isPlanningSession && prev) return prev;
 
         const rawGnssAlt = p.coords.altitude;
-        const prevBaro = prev ? prev.alt_baro : null;
+        const currentRawBaroAlt = rawBaroAltRef.current;
+        let prevBaro = prev ? prev.alt_baro : null;
+
+        if (prevBaro === null && currentRawBaroAlt !== null) {
+          if (baroOffsetRef.current === null) {
+            if (rawGnssAlt !== null && rawGnssAlt !== undefined) {
+              baroOffsetRef.current = rawGnssAlt - currentRawBaroAlt;
+            } else {
+              baroOffsetRef.current = 0;
+            }
+          }
+          prevBaro = currentRawBaroAlt + (baroOffsetRef.current ?? 0);
+          setCalibratedBaroAlt(prevBaro);
+        }
+
         const prevLidar = prev ? prev.alt_lidar : null;
 
         let alt = rawGnssAlt;
@@ -2891,19 +2928,80 @@ const App: React.FC = () => {
             <div className="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 pointer-events-auto">
               <div 
                 onClick={(e) => e.stopPropagation()}
-                className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden select-text pointer-events-auto"
+                className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden select-text pointer-events-auto"
                 style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
               >
                 <div className="p-6 border-b border-white/5 flex justify-between items-center bg-slate-800/50">
                   <div className="flex items-center gap-3">
                     <Cpu size={20} className="text-blue-400" />
-                    <h3 className="text-lg font-black uppercase tracking-tighter">LiDAR Diagnostic Data</h3>
+                    <h3 className="text-lg font-black uppercase tracking-tighter">System & Sensor Diagnostics</h3>
                   </div>
                   <button onClick={() => setShowLidarDebug(false)} className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-white active:scale-90 transition-all pointer-events-auto">
                     <X size={20} />
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 font-mono text-xs select-text">
+                  <section className="select-text border-b border-white/5 pb-4">
+                    <h4 className="text-blue-400 font-bold uppercase mb-2 text-[10px] tracking-widest">Barometric Pressure Sensor</h4>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="bg-black/40 p-3 rounded-xl border border-white/5 select-text">
+                        <span className="text-white/40 uppercase text-[8px] font-bold block mb-1">Status</span>
+                        <span className={`font-bold uppercase tracking-wider text-[11px] ${
+                          baroStatus === 'reading' ? 'text-emerald-400' :
+                          baroStatus === 'running' ? 'text-blue-400 animate-pulse' :
+                          baroStatus === 'initializing' ? 'text-yellow-400 animate-pulse' :
+                          baroStatus === 'unsupported' ? 'text-rose-500' : 'text-orange-500'
+                        }`}>
+                          {baroStatus === 'reading' ? '● Active (Reading)' :
+                           baroStatus === 'running' ? '● Active (No Data)' :
+                           baroStatus === 'initializing' ? 'Initializing...' :
+                           baroStatus === 'unsupported' ? 'Unsupported' :
+                           baroStatus === 'error' ? 'Sensor Error' : baroStatus}
+                        </span>
+                      </div>
+                      <div className="bg-black/40 p-3 rounded-xl border border-white/5 select-text">
+                        <span className="text-white/40 uppercase text-[8px] font-bold block mb-1">API Interface</span>
+                        <span className="text-slate-200 font-bold">
+                          {('PressureSensor' in window) ? 'PressureSensor API' : ('Barometer' in window) ? 'Barometer API' : 'Not Found'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div className="bg-black/40 p-3 rounded-xl border border-white/5 select-text">
+                        <span className="text-white/40 uppercase text-[8px] font-bold block mb-1">Current Pressure</span>
+                        <span className="text-yellow-400 font-bold tabular-nums">
+                          {rawPressure !== null ? `${rawPressure.toFixed(2)} hPa` : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="bg-black/40 p-3 rounded-xl border border-white/5 select-text">
+                        <span className="text-white/40 uppercase text-[8px] font-bold block mb-1">Calibrated Alt</span>
+                        <span className="text-blue-400 font-bold tabular-nums">
+                          {calibratedBaroAlt !== null ? `${calibratedBaroAlt.toFixed(1)}${units === 'Yards' ? 'ft' : 'm'}` : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-black/40 p-3 rounded-xl border border-white/5 select-text mb-3">
+                      <span className="text-white/40 uppercase text-[8px] font-bold block mb-1">Relative Altitude Offset</span>
+                      <span className="text-slate-300 font-bold tabular-nums">
+                        {baroOffsetRef.current !== null ? `${baroOffsetRef.current.toFixed(1)}${units === 'Yards' ? 'ft' : 'm'} (Calibrated with GPS)` : 'Not yet calibrated (Awaiting GPS fix)'}
+                      </span>
+                    </div>
+
+                    {baroError && (
+                      <div className="p-3 bg-rose-950/40 border border-rose-500/30 text-rose-400 rounded-xl select-text">
+                        <span className="uppercase text-[8px] font-bold block mb-1 text-rose-500">Error Logs</span>
+                        <p className="font-semibold leading-relaxed text-[10px]">{baroError}</p>
+                        <div className="mt-2 text-[10px] text-rose-400/80 leading-relaxed space-y-1">
+                          <p>• Ensure "Generic Sensor Extra Classes" is enabled in chrome://flags if on older Chromium browser.</p>
+                          <p>• Make sure Device Motion, Orientation & pressure sensor permissions are granted in site settings.</p>
+                          <p>• Note: Standard iOS Safari does not support the web Barometer API; rely on manual elevation tools or LiDAR instead.</p>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
                   <section className="select-text">
                     <h4 className="text-blue-400 font-bold uppercase mb-2 text-[10px] tracking-widest">Elevation Source</h4>
                     <div className="bg-black/40 p-3 rounded-xl border border-white/5 select-text font-bold text-emerald-400">
