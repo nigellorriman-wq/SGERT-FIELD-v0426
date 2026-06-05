@@ -93,6 +93,7 @@ export interface SavedRecord {
   points: GeoPoint[]; 
   pivots?: GeoPoint[]; 
   holeNumber?: number;
+  baroDiffStr?: string;
   raterPathPoints?: GeoPoint[]; 
   pivotPoints?: PivotRecord[]; 
   genderRated?: RatingGender; 
@@ -1698,6 +1699,18 @@ const App: React.FC = () => {
   const [rawPressure, setRawPressure] = useState<number | null>(null);
   const [calibratedBaroAlt, setCalibratedBaroAlt] = useState<number | null>(null);
   const rawBaroAltRef = useRef<number | null>(null);
+  const [liveBaroDiffStr, setLiveBaroDiffStr] = useState<string>("0.0");
+  const baroHoleStartAlt = useRef<number | null>(null);
+  const trkActiveRef = useRef(false);
+  const unitsRef = useRef(units);
+
+  useEffect(() => {
+    trkActiveRef.current = trkActive;
+  }, [trkActive]);
+
+  useEffect(() => {
+    unitsRef.current = units;
+  }, [units]);
   const [reportGreens, setReportGreens] = useState<SavedRecord[]>([]);
   const [reportFileName, setReportFileName] = useState("");
   // Removed planningReport and Terrain Manager states for Field Edition stability
@@ -1725,6 +1738,19 @@ const App: React.FC = () => {
             
             const rawBaroAlt = 44330 * (1 - Math.pow(pressure / 1013.25, 1 / 5.255));
             rawBaroAltRef.current = rawBaroAlt;
+
+            // Decoupled relative barometric altitude for the active hole
+            if (trkActiveRef.current) {
+              if (baroHoleStartAlt.current === null) {
+                baroHoleStartAlt.current = rawBaroAlt;
+              }
+              const currentDiff = (rawBaroAlt - baroHoleStartAlt.current) * (unitsRef.current === 'Yards' ? 3.28084 : 1.0);
+              if (Math.abs(currentDiff) > 999) {
+                setLiveBaroDiffStr("-");
+              } else {
+                setLiveBaroDiffStr(`${currentDiff > 0 ? '+' : ''}${currentDiff.toFixed(1)}`);
+              }
+            }
             
             // Calculate a temporary calibrated alt even if pos is not yet established, for display purposes in diagnostics
             const offset = baroOffsetRef.current ?? 0;
@@ -2287,6 +2313,8 @@ const App: React.FC = () => {
     })();
 
     const baroDiffStr = (() => {
+      if (trkActive) return liveBaroDiffStr;
+      if (viewingRecord) return viewingRecord.baroDiffStr || "N/A";
       if (!startPoint || !targetPoint) return "N/A";
       const sAlt = (startPoint.alt_baro !== undefined && startPoint.alt_baro !== null) ? startPoint.alt_baro : (startPoint.source === 'Barometric' ? startPoint.alt : null);
       const tAlt = (targetPoint.alt_baro !== undefined && targetPoint.alt_baro !== null) ? targetPoint.alt_baro : (targetPoint.source === 'Barometric' ? targetPoint.alt : null);
@@ -2308,10 +2336,10 @@ const App: React.FC = () => {
 
     if (viewingRecord && viewingRecord.type === 'Track' && viewingRecord.effectiveDistances) {
       const raterPathMetrics = calculatePathDistanceAndElevation(viewingRecord.raterPathPoints || [], distMult, elevMult);
-      return { distRater: raterPathMetrics.distance, elevRater: raterPathMetrics.elevation, distScratch: viewingRecord.effectiveDistances.scratch, elevScratch: viewingRecord.effectiveElevations?.scratch || 0, distBogey: viewingRecord.effectiveDistances.bogey, elevBogey: viewingRecord.effectiveElevations?.bogey || 0, effectivePaths: viewingRecord.effectivePaths, sectorScratch, sectorBogey, gnssDiffStr, baroDiffStr, lidarDiffStr };
+      return { distRater: raterPathMetrics.distance, elevRater: raterPathMetrics.elevation, distScratch: viewingRecord.effectiveDistances.scratch, elevScratch: viewingRecord.effectiveElevations?.scratch || 0, distBogey: viewingRecord.effectiveDistances.bogey, elevBogey: viewingRecord.effectiveElevations?.bogey || 0, effectivePaths: viewingRecord.effectivePaths, sectorScratch, sectorBogey, gnssDiffStr, baroDiffStr: viewingRecord.baroDiffStr || baroDiffStr, lidarDiffStr };
     }
 
-    if (currentRaterPath.length < 2) return { distRater: 0, elevRater: 0, distScratch: 0, elevScratch: 0, distBogey: 0, elevBogey: 0, effectivePaths: { scratch: [], bogey: [] }, sectorScratch: null, sectorBogey: null, gnssDiffStr: "N/A", baroDiffStr: "N/A", lidarDiffStr: "N/A" };
+    if (currentRaterPath.length < 2) return { distRater: 0, elevRater: 0, distScratch: 0, elevScratch: 0, distBogey: 0, elevBogey: 0, effectivePaths: { scratch: [], bogey: [] }, sectorScratch: null, sectorBogey: null, gnssDiffStr: "N/A", baroDiffStr: trkActive ? liveBaroDiffStr : "N/A", lidarDiffStr: "N/A" };
     
     const calculated = calculateEffectivePathsAndMetrics(currentRaterPath, pivs, distMult, elevMult);
     const raterPathMetrics = calculatePathDistanceAndElevation(currentRaterPath, distMult, elevMult);
@@ -3272,6 +3300,8 @@ const App: React.FC = () => {
                           <button onClick={() => { 
                             if(!trkActive) { 
                               setTrkActive(true); 
+                              baroHoleStartAlt.current = rawBaroAltRef.current;
+                              setLiveBaroDiffStr(rawBaroAltRef.current !== null ? "0.0" : "N/A");
                               if (isPlanningSession) {
                                 setTrkPoints([]); // Don't add first point automatically in planning
                               } else {
@@ -3299,7 +3329,8 @@ const App: React.FC = () => {
                                 effectivePaths: calculated.effectivePaths, 
                                 holeNumber: holeNum,
                                 isPlanning: isPlanningSession,
-                                teebox: teebox
+                                teebox: teebox,
+                                baroDiffStr: liveBaroDiffStr
                               }); 
                               setTrkActive(false); 
                             } 
