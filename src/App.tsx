@@ -72,7 +72,10 @@ export interface GeoPoint {
   altAccuracy: number | null;
   timestamp: number;
   type?: 'green' | 'bunker';
-  source?: 'GPS' | 'LiDAR' | 'Manual' | 'Manual/LiDAR';
+  source?: 'GPS' | 'LiDAR' | 'Manual' | 'Manual/LiDAR' | 'Barometric';
+  alt_gnss?: number | null;
+  alt_baro?: number | null;
+  alt_lidar?: number | null;
 }
 
 export interface PivotRecord {
@@ -452,8 +455,9 @@ const getAccuracyTextColor = (accuracy: number): string => {
   return 'text-rose-500';
 };
 
-const getVerticalMethod = (accuracy: number | null, alt: number | null): string => {
-  if (accuracy === 0.2) return 'LiDAR DTM';
+const getVerticalMethod = (accuracy: number | null, alt: number | null, source?: string): string => {
+  if (source === 'Barometric') return 'Barometric';
+  if (accuracy === 0.2 || source === 'LiDAR' || source === 'Manual/LiDAR') return 'LiDAR DTM';
   if (accuracy !== null && accuracy < 1.0) return 'Barometric'; 
   else if (alt !== null) return 'GNSS 3D'; 
   return 'Vertical (Searching)'; 
@@ -789,51 +793,7 @@ const calculateEffectivePathsAndMetrics = (
     for (let i = 0; i < anchors.length - 1; i++) {
       const p1 = anchors[i];
       const p2 = anchors[i+1];
-      let shouldBeStraight = false;
-      
-      const p1Idx = timestampToIndex.get(p1.timestamp) ?? -1;
-      const p2Idx = timestampToIndex.get(p2.timestamp) ?? -1;
-
-      if (p1Idx === -1 || p2Idx === -1 || p1Idx >= p2Idx) {
-        shouldBeStraight = true;
-      } else {
-        // Optimization: Check if any relevant pivots are between p1 and p2 in the rater path
-        // Instead of slice().some(), we can just check the sortedPivots list
-        if (isScratchPath) {
-          const p2IsScratchCut = sortedPivots.some(p => p.point.timestamp === p2.timestamp && p.type === 'scratch_cut');
-          if (p2IsScratchCut) {
-            shouldBeStraight = true;
-          } else {
-            // Check if any bogey_round pivots exist between p1 and p2 timestamps
-            const hasSkippedBogey = sortedPivots.some(p => 
-              p.type === 'bogoy_round' && 
-              p.point.timestamp > p1.timestamp && 
-              p.point.timestamp < p2.timestamp
-            );
-            if (hasSkippedBogey) shouldBeStraight = true;
-          }
-        } else {
-          // Check if any scratch_cut pivots exist between p1 and p2 timestamps
-          const hasSkippedScratch = sortedPivots.some(p => 
-            p.type === 'scratch_cut' && 
-            p.point.timestamp > p1.timestamp && 
-            p.point.timestamp < p2.timestamp
-          );
-          if (hasSkippedScratch) shouldBeStraight = true;
-        }
-      }
-      
-      if (shouldBeStraight) {
-        path.push(...getInterpolatedLine(p1, p2, 10).slice(1));
-      } else {
-        if (p1Idx !== -1 && p2Idx !== -1 && p1Idx < p2Idx) {
-          for (let j = p1Idx + 1; j <= p2Idx; j++) {
-            path.push(raterPathPoints[j]);
-          }
-        } else {
-          path.push(...getInterpolatedLine(p1, p2, 10).slice(1));
-        }
-      }
+      path.push(...getInterpolatedLine(p1, p2, 10).slice(1));
     }
     return path;
   };
@@ -1740,6 +1700,69 @@ const App: React.FC = () => {
   const CONCAVITY_FIXED = 0.82;
   const greenStartRef = useRef<GeoPoint | null>(null);
   const lidarFetchRef = useRef<number>(0);
+  const baroOffsetRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let sensor: any = null;
+    const isSupported = ('PressureSensor' in window) || ('Barometer' in window);
+    
+    if (isSupported) {
+      try {
+        const SensorClass = (window as any).PressureSensor || (window as any).Barometer;
+        sensor = new SensorClass({ frequency: 1 });
+        
+        sensor.addEventListener('reading', () => {
+          const pressure = sensor.pressure;
+          if (typeof pressure === 'number' && !isNaN(pressure)) {
+            const rawBaroAlt = 44330 * (1 - Math.pow(pressure / 1013.25, 1 / 5.255));
+            
+            setPos(prev => {
+              if (!prev) return null;
+              
+              if (baroOffsetRef.current === null) {
+                if (prev.alt !== null) {
+                  baroOffsetRef.current = prev.alt - rawBaroAlt;
+                } else {
+                  baroOffsetRef.current = 0;
+                }
+              }
+              
+              const calibratedAlt = rawBaroAlt + (baroOffsetRef.current ?? 0);
+              const hasLidar = prev.source === 'LiDAR' || prev.source === 'Manual/LiDAR';
+              return {
+                ...prev,
+                alt_baro: calibratedAlt,
+                alt: hasLidar ? prev.alt : calibratedAlt,
+                altAccuracy: hasLidar ? prev.altAccuracy : 0.5,
+                source: hasLidar ? prev.source : 'Barometric'
+              };
+            });
+          }
+        });
+        
+        sensor.addEventListener('error', (event: any) => {
+          console.warn('[Pressure/Barometer] sensor error:', event.error);
+        });
+        
+        sensor.start();
+        console.log('[Pressure/Barometer] sensor started successfully');
+      } catch (err) {
+        console.warn('[Pressure/Barometer] initialization failed:', err);
+      }
+    } else {
+      console.log('[Pressure/Barometer] sensor is not supported on this device/browser');
+    }
+    
+    return () => {
+      if (sensor) {
+        try {
+          sensor.stop();
+        } catch (e) {
+          console.error('[Pressure/Barometer] stop error:', e);
+        }
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isPlanningSession && mapCenter) {
@@ -1759,7 +1782,10 @@ const App: React.FC = () => {
             timestamp: Date.now(),
             alt: alt,
             altAccuracy: alt !== null ? 0.2 : null,
-            source: sourceStr
+            source: sourceStr,
+            alt_gnss: prev ? prev.alt_gnss : null,
+            alt_baro: prev ? prev.alt_baro : null,
+            alt_lidar: alt
           };
         });
       }, 250);
@@ -1850,14 +1876,44 @@ const App: React.FC = () => {
         // CRITICAL: If we are in a planning session, do not let GNSS background updates overwrite manual/planning position
         if (isPlanningSession && prev) return prev;
 
+        const rawGnssAlt = p.coords.altitude;
+        const prevBaro = prev ? prev.alt_baro : null;
+        const prevLidar = prev ? prev.alt_lidar : null;
+
+        let alt = rawGnssAlt;
+        let altAccuracy = p.coords.altitudeAccuracy;
+        let source: 'GPS' | 'LiDAR' | 'Manual' | 'Manual/LiDAR' | 'Barometric' = 'GPS';
+
+        if (prevLidar !== null && prevLidar !== undefined) {
+          alt = prevLidar;
+          altAccuracy = 0.2;
+          source = 'LiDAR';
+        } else if (prevBaro !== null && prevBaro !== undefined) {
+          alt = prevBaro;
+          altAccuracy = 0.5;
+          source = 'Barometric';
+        }
+
+        if (prev && (prev.source === 'LiDAR' || prev.source === 'Barometric' || prev.source === 'Manual/LiDAR')) {
+          const dist = L.latLng(prev.lat, prev.lng).distanceTo(L.latLng(p.coords.latitude, p.coords.longitude));
+          if (dist < 8) {
+            alt = prev.alt;
+            altAccuracy = prev.altAccuracy;
+            source = prev.source;
+          }
+        }
+
         const newPos: GeoPoint = { 
           lat: p.coords.latitude, 
           lng: p.coords.longitude, 
-          alt: p.coords.altitude, 
+          alt, 
           accuracy: p.coords.accuracy, 
-          altAccuracy: p.coords.altitudeAccuracy, 
+          altAccuracy, 
           timestamp: Date.now(),
-          source: 'GPS'
+          source,
+          alt_gnss: rawGnssAlt,
+          alt_baro: prevBaro,
+          alt_lidar: prevLidar
         };
 
         // Scotland boundary check for initial fix
@@ -1961,10 +2017,13 @@ const App: React.FC = () => {
             const LIDAR_ACCURACY = 0.2;
             setPos(prev => {
               if (!prev || prev.timestamp > currentTs) return prev;
-              if (prev.altAccuracy === null || prev.altAccuracy > LIDAR_ACCURACY) {
-                return { ...prev, alt: lidarAlt, altAccuracy: LIDAR_ACCURACY, source: 'LiDAR' };
-              }
-              return prev;
+              return { 
+                ...prev, 
+                alt: lidarAlt, 
+                altAccuracy: LIDAR_ACCURACY, 
+                source: 'LiDAR',
+                alt_lidar: lidarAlt
+              };
             });
           }
         }
@@ -2007,10 +2066,6 @@ const App: React.FC = () => {
           }
         }
 
-        if (dist > 2 && !isPlanningSession) {
-          return [...updated, pos];
-        }
-        
         return changed ? updated : prev;
       });
     }
@@ -2145,6 +2200,7 @@ const App: React.FC = () => {
     const currentRaterPath = [...trkPoints, ...(trkActive && pos ? [pos] : [])].filter(Boolean) as GeoPoint[];
     const pivs = viewingRecord ? (viewingRecord.pivotPoints || []) : currentPivots;
     const targetPoint = viewingRecord ? (viewingRecord.raterPathPoints ? viewingRecord.raterPathPoints[viewingRecord.raterPathPoints.length - 1] : null) : (trkActive ? pos : (trkPoints.length > 0 ? trkPoints[trkPoints.length-1] : null));
+    const startPoint = viewingRecord ? (viewingRecord.raterPathPoints ? viewingRecord.raterPathPoints[0] : null) : (trkPoints.length > 0 ? trkPoints[0] : null);
 
     const sectorScratch = (() => {
       if (!targetPoint) return null;
@@ -2161,12 +2217,39 @@ const App: React.FC = () => {
       return null;
     })();
 
+    const gnssDiffStr = (() => {
+      if (!startPoint || !targetPoint) return "N/A";
+      const sAlt = startPoint.alt_gnss !== undefined ? startPoint.alt_gnss : (startPoint.source === 'GPS' ? startPoint.alt : null);
+      const tAlt = targetPoint.alt_gnss !== undefined ? targetPoint.alt_gnss : (targetPoint.source === 'GPS' ? targetPoint.alt : null);
+      if (sAlt === null || sAlt === undefined || tAlt === null || tAlt === undefined) return "N/A";
+      const diff = (tAlt - sAlt) * elevMult;
+      return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
+    })();
+
+    const baroDiffStr = (() => {
+      if (!startPoint || !targetPoint) return "N/A";
+      const sAlt = startPoint.alt_baro !== undefined ? startPoint.alt_baro : (startPoint.source === 'Barometric' ? startPoint.alt : null);
+      const tAlt = targetPoint.alt_baro !== undefined ? targetPoint.alt_baro : (targetPoint.source === 'Barometric' ? targetPoint.alt : null);
+      if (sAlt === null || sAlt === undefined || tAlt === null || tAlt === undefined) return "N/A";
+      const diff = (tAlt - sAlt) * elevMult;
+      return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
+    })();
+
+    const lidarDiffStr = (() => {
+      if (!startPoint || !targetPoint) return "N/A";
+      const sAlt = startPoint.alt_lidar !== undefined ? startPoint.alt_lidar : (['LiDAR', 'Manual/LiDAR'].includes(startPoint.source || '') ? startPoint.alt : null);
+      const tAlt = targetPoint.alt_lidar !== undefined ? targetPoint.alt_lidar : (['LiDAR', 'Manual/LiDAR'].includes(targetPoint.source || '') ? targetPoint.alt : null);
+      if (sAlt === null || sAlt === undefined || tAlt === null || tAlt === undefined) return "N/A";
+      const diff = (tAlt - sAlt) * elevMult;
+      return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
+    })();
+
     if (viewingRecord && viewingRecord.type === 'Track' && viewingRecord.effectiveDistances) {
       const raterPathMetrics = calculatePathDistanceAndElevation(viewingRecord.raterPathPoints || [], distMult, elevMult);
-      return { distRater: raterPathMetrics.distance, elevRater: raterPathMetrics.elevation, distScratch: viewingRecord.effectiveDistances.scratch, elevScratch: viewingRecord.effectiveElevations?.scratch || 0, distBogey: viewingRecord.effectiveDistances.bogey, elevBogey: viewingRecord.effectiveElevations?.bogey || 0, effectivePaths: viewingRecord.effectivePaths, sectorScratch, sectorBogey };
+      return { distRater: raterPathMetrics.distance, elevRater: raterPathMetrics.elevation, distScratch: viewingRecord.effectiveDistances.scratch, elevScratch: viewingRecord.effectiveElevations?.scratch || 0, distBogey: viewingRecord.effectiveDistances.bogey, elevBogey: viewingRecord.effectiveElevations?.bogey || 0, effectivePaths: viewingRecord.effectivePaths, sectorScratch, sectorBogey, gnssDiffStr, baroDiffStr, lidarDiffStr };
     }
 
-    if (currentRaterPath.length < 2) return { distRater: 0, elevRater: 0, distScratch: 0, elevScratch: 0, distBogey: 0, elevBogey: 0, effectivePaths: { scratch: [], bogey: [] }, sectorScratch: null, sectorBogey: null };
+    if (currentRaterPath.length < 2) return { distRater: 0, elevRater: 0, distScratch: 0, elevScratch: 0, distBogey: 0, elevBogey: 0, effectivePaths: { scratch: [], bogey: [] }, sectorScratch: null, sectorBogey: null, gnssDiffStr: "N/A", baroDiffStr: "N/A", lidarDiffStr: "N/A" };
     
     const calculated = calculateEffectivePathsAndMetrics(currentRaterPath, pivs, distMult, elevMult);
     const raterPathMetrics = calculatePathDistanceAndElevation(currentRaterPath, distMult, elevMult);
@@ -2181,7 +2264,10 @@ const App: React.FC = () => {
       effectivePaths: calculated.effectivePaths, 
       effectiveAnchors: calculated.effectiveAnchors,
       sectorScratch, 
-      sectorBogey 
+      sectorBogey,
+      gnssDiffStr,
+      baroDiffStr,
+      lidarDiffStr
     };
   }, [trkPoints, currentPivots, trkActive, pos, viewingRecord, distMult, elevMult, isPlanningSession]);
 
@@ -2894,9 +2980,22 @@ const App: React.FC = () => {
                             })()}
                         </div>
                       </div>
-                      <div className="col-span-1 text-center border-l border-white/10 flex flex-col items-center justify-center">
+                      <div className="col-span-1 text-center border-l border-white/10 flex flex-col items-center justify-center h-full">
                         <span className="text-[10px] font-bold text-white/40 uppercase block mb-2 leading-none">ELEVATION</span>
-                        <div className={`text-4xl font-bold tabular-nums leading-none tracking-tighter ${(!viewingRecord && !['Barometric', 'LiDAR DTM'].includes(getVerticalMethod(pos?.altAccuracy ?? null, pos?.alt ?? null))) ? 'text-rose-500 animate-pulse' : 'text-yellow-400'}`}>{`${effectiveMetrics.elevRater > 0 ? '+' : ''}${effectiveMetrics.elevRater.toFixed(1)}`}<span className="text-[10px] ml-0.5 opacity-40 uppercase">{units === 'Yards' ? 'FT' : 'M'}</span></div>
+                        <div className="flex flex-col gap-1 w-full text-[10px] items-center my-0.5">
+                          <div className="flex gap-1 justify-between items-center w-full px-2">
+                            <span className="text-[8px] font-black tracking-tighter text-rose-500 uppercase">GNSS:</span>
+                            <span className="font-bold text-slate-100 tabular-nums">{effectiveMetrics.gnssDiffStr !== 'N/A' ? `${effectiveMetrics.gnssDiffStr}${(units === 'Yards' ? 'ft' : 'm')}` : 'N/A'}</span>
+                          </div>
+                          <div className="flex gap-1 justify-between items-center w-full px-2">
+                            <span className="text-[8px] font-black tracking-tighter text-blue-400 uppercase">BARO:</span>
+                            <span className="font-bold text-slate-100 tabular-nums">{effectiveMetrics.baroDiffStr !== 'N/A' ? `${effectiveMetrics.baroDiffStr}${(units === 'Yards' ? 'ft' : 'm')}` : 'N/A'}</span>
+                          </div>
+                          <div className="flex gap-1 justify-between items-center w-full px-2">
+                            <span className="text-[8px] font-black tracking-tighter text-yellow-400 uppercase">LIDAR:</span>
+                            <span className="font-bold text-slate-100 tabular-nums">{effectiveMetrics.lidarDiffStr !== 'N/A' ? `${effectiveMetrics.lidarDiffStr}${(units === 'Yards' ? 'ft' : 'm')}` : 'N/A'}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     {pos && !viewingRecord && !isPlanningSession && (
@@ -2906,8 +3005,8 @@ const App: React.FC = () => {
                           <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">GNSS: {pos.accuracy.toFixed(1)}m</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <div className={`w-1.5 h-1.5 rounded-full ${getVerticalMethod(pos.altAccuracy, pos.alt) === 'Barometric' ? 'bg-blue-500' : (getVerticalMethod(pos.altAccuracy, pos.alt) === 'LiDAR DTM' ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]' : 'bg-emerald-500')}`} title="Elevation Method"></div>
-                          <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{getVerticalMethod(pos.altAccuracy, pos.alt)}{pos.altAccuracy !== null && `: ±${pos.altAccuracy.toFixed(1)}m`}</span>
+                          <div className={`w-1.5 h-1.5 rounded-full ${getVerticalMethod(pos.altAccuracy, pos.alt, pos.source) === 'Barometric' ? 'bg-blue-500' : (getVerticalMethod(pos.altAccuracy, pos.alt, pos.source) === 'LiDAR DTM' ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]' : 'bg-emerald-500')}`} title="Elevation Method"></div>
+                          <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{getVerticalMethod(pos.altAccuracy, pos.alt, pos.source)}{pos.altAccuracy !== null && `: ±${pos.altAccuracy.toFixed(1)}m`}</span>
                         </div>
                       </div>
                     )}
