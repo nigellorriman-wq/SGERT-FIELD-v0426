@@ -1153,10 +1153,10 @@ const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         >
           <Home size={20} className="text-white" />
         </button>
-        <h1 className="text-3xl tracking-tighter font-semibold text-blue-500">Sloping Greens</h1>
+        <h1 className="text-3xl tracking-tighter font-semibold text-blue-500">Green Speed Calc</h1>
       </div>
       <div className="flex flex-col items-center mb-6">
-        <p className="text-white text-[9px] font-black uppercase tracking-widest text-center">Speed correction for sloping greens</p>
+        <p className="text-white text-[9px] font-black uppercase tracking-widest text-center">Green Surface Rating calculator</p>
       </div>
       <div className="flex flex-col gap-4">
         <div className="bg-slate-900/50 border border-white/5 rounded-[1.8rem] p-4">
@@ -2725,8 +2725,8 @@ const App: React.FC = () => {
             {/* Removed Planning Report Tool button for Field Edition stability */}
             <button onClick={() => { setViewingRecord(null); setView('stimp'); }} className="bg-slate-900 border border-white/5 rounded-[2.5rem] p-10 flex flex-col items-center justify-center shadow-2xl active:scale-95 transition-all">
               <div className="w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-emerald-600/40"><Gauge size={28} /></div>
-              <h2 className="text-2xl font-bold mb-2 uppercase text-emerald-500">Stimp Slopes</h2>
-              <p className="text-white text-[13px] font-medium text-center max-w-[220px]">Speed correction for sloping greens</p>
+              <h2 className="text-2xl font-bold mb-2 uppercase text-emerald-500">Green Speed Calc</h2>
+              <p className="text-white text-[13px] font-medium text-center max-w-[220px]">Green Surface Rating calculator</p>
             </button>
             <button onClick={() => setView('manual')} className="mt-2 bg-slate-800/50 border border-white/10 rounded-[1.8rem] py-6 flex items-center justify-center gap-4 active:bg-slate-700 transition-colors">
               <BookOpen size={20} className="text-blue-400" />
