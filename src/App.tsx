@@ -1044,6 +1044,33 @@ const UserManual: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
+const RATING_TABLE: Record<string, { scratch: number; bogey: number }[]> = {
+  "RF/GS": [
+    { scratch: 3, bogey: 3 }, // 6'11" or less
+    { scratch: 4, bogey: 4 }, // 7' to 8' 5"
+    { scratch: 5, bogey: 5 }, // 8' 6" to 9' 11"
+    { scratch: 6, bogey: 6 }, // 10' to 10' 11"
+    { scratch: 7, bogey: 7 }, // 11' to 11' 11"
+    { scratch: 8, bogey: 8 }  // 12' or more
+  ],
+  "MC/MS": [
+    { scratch: 4, bogey: 4 },
+    { scratch: 5, bogey: 5 },
+    { scratch: 6, bogey: 6 },
+    { scratch: 7, bogey: 8 },
+    { scratch: 8, bogey: 9 },
+    { scratch: 9, bogey: 10 }
+  ],
+  "HC/SS": [
+    { scratch: 5, bogey: 5 },
+    { scratch: 6, bogey: 6 },
+    { scratch: 7, bogey: 8 },
+    { scratch: 8, bogey: 9 },
+    { scratch: 9, bogey: 10 },
+    { scratch: 10, bogey: 10 }
+  ]
+};
+
 const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [sDownFt, setSDownFt] = useState(0);
   const [sDownIn, setSDownIn] = useState(0);
@@ -1077,12 +1104,51 @@ const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     if (inches === 12) return `${ft + 1}' 0"`;
     return `${ft}' ${inches}"`;
   };
+  const getRatingDetails = (speedVal: number | null, subCat: string | null) => {
+    if (speedVal === null || !subCat) return null;
+    const ft = Math.floor(speedVal);
+    const inches = Math.round((speedVal - ft) * 12);
+    const totalInches = ft * 12 + (inches === 12 ? 12 : inches);
+    
+    let rangeLabel = "";
+    let rowIndex = 0;
+    
+    if (totalInches <= 83) {
+      rangeLabel = "6' 11\" or less";
+      rowIndex = 0;
+    } else if (totalInches <= 101) {
+      rangeLabel = "7' to 8' 5\"";
+      rowIndex = 1;
+    } else if (totalInches <= 119) {
+      rangeLabel = "8' 6\" to 9' 11\"";
+      rowIndex = 2;
+    } else if (totalInches <= 131) {
+      rangeLabel = "10' to 10' 11\"";
+      rowIndex = 3;
+    } else if (totalInches <= 143) {
+      rangeLabel = "11' to 11' 11\"";
+      rowIndex = 4;
+    } else {
+      rangeLabel = "12' or more";
+      rowIndex = 5;
+    }
+    
+    const lookupKey = subCat.toUpperCase();
+    const tableData = RATING_TABLE[lookupKey];
+    if (!tableData || !tableData[rowIndex]) return null;
+    
+    return {
+      rangeLabel,
+      scratchVal: tableData[rowIndex].scratch,
+      bogeyVal: tableData[rowIndex].bogey
+    };
+  };
   return (
     <div className="fixed inset-0 z-[2000] bg-[#020617] flex flex-col p-4 overflow-y-auto no-scrollbar">
       <div className="flex justify-between items-center mb-4 mt-2">
 <button 
           onClick={onClose} 
-          className="bg-slate-800 border border-white/20 w-[46px] h-[46px] rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all"
+          className="bg-slate-800 border border-white/20 w-[46px] h-[46px] rounded-full flex flex-center shadow-2xl active:scale-95 transition-all text-white flex items-center justify-center font-bold"
           title="Home"
         >
           <Home size={20} className="text-white" />
@@ -1097,7 +1163,7 @@ const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <h3 className="text-lg font-black text-orange-400 uppercase tracking-tight mb-4">s(down) Distance</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col items-center gap-2">
-              <span className="text-[9px] font-black text-white uppercase">Feet</span>
+              <span className="text-sm font-black text-white uppercase">Feet</span>
               <div className="flex items-stretch bg-slate-800/80 rounded-[1.2rem] overflow-hidden border border-white/5 w-full h-[120px]">
                 <div className="flex-1 flex items-center justify-center bg-slate-900/40"><span className="text-3xl font-black tabular-nums">{sDownFt}</span></div>
                 <div className="w-16 flex flex-col border-l border-white/5">
@@ -1107,7 +1173,7 @@ const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
             </div>
             <div className="flex flex-col items-center gap-2">
-              <span className="text-[9px] font-black text-white uppercase">Inches</span>
+              <span className="text-sm font-black text-white uppercase">Inches</span>
               <div className="flex items-stretch bg-slate-800/80 rounded-[1.2rem] overflow-hidden border border-white/5 w-full h-[120px]">
                 <div className="flex-1 flex items-center justify-center bg-slate-900/40"><span className="text-3xl font-black tabular-nums">{sDownIn}</span></div>
                 <div className="w-16 flex flex-col border-l border-white/5">
@@ -1122,7 +1188,7 @@ const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <h3 className="text-lg font-black text-emerald-400 uppercase tracking-tight mb-4">s(up) Distance</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col items-center gap-2">
-              <span className="text-[9px] font-black text-white uppercase">Feet</span>
+              <span className="text-sm font-black text-white uppercase">Feet</span>
               <div className="flex items-stretch bg-slate-800/80 rounded-[1.2rem] overflow-hidden border border-white/5 w-full h-[120px]">
                 <div className="flex-1 flex items-center justify-center bg-slate-900/40"><span className="text-3xl font-black tabular-nums">{sUpFt}</span></div>
                 <div className="w-16 flex flex-col border-l border-white/5">
@@ -1132,7 +1198,7 @@ const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               </div>
             </div>
             <div className="flex flex-col items-center gap-2">
-              <span className="text-[9px] font-black text-white uppercase">Inches</span>
+              <span className="text-sm font-black text-white uppercase">Inches</span>
               <div className="flex items-stretch bg-slate-800/80 rounded-[1.2rem] overflow-hidden border border-white/5 w-full h-[120px]">
                 <div className="flex-1 flex items-center justify-center bg-slate-900/40"><span className="text-3xl font-black tabular-nums">{sUpIn}</span></div>
                 <div className="w-16 flex flex-col border-l border-white/5">
@@ -1157,8 +1223,32 @@ const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   </div>
                 )}
               </div>
+              
+              {(() => {
+                const details = getRatingDetails(result, slopeSub);
+                if (!details) return null;
+                return (
+                  <div className="mt-6 pt-6 border-t border-white/10 w-full flex flex-col gap-3">
+                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-white">
+                      <span>Green Surface Rating</span>
+                      <span className="text-white font-mono normal-case">Range: {details.rangeLabel}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 w-full mt-1">
+                      <div className="bg-slate-900/60 rounded-2xl p-4 border border-white/5 flex flex-col items-center justify-center">
+                        <span className="text-[9px] font-semibold uppercase tracking-wider text-emerald-400 mb-1">Scratch Rating</span>
+                        <span className="text-4xl font-black text-white">{details.scratchVal}</span>
+                      </div>
+                      <div className="bg-slate-900/60 rounded-2xl p-4 border border-white/5 flex flex-col items-center justify-center">
+                        <span className="text-[9px] font-semibold uppercase tracking-wider text-rose-400 mb-1">Bogey Rating</span>
+                        <span className="text-4xl font-black text-white">{details.bogeyVal}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="mt-6 pt-6 border-t border-white/10 w-full flex justify-center">
-                <p className="text-center font-light text-white leading-relaxed tracking-tight text-[14px]">(2x<span className="text-orange-400 font-semibold">s(down)</span> x <span className="text-emerald-400 font-semibold">s(up)</span>)÷(<span className="text-orange-400 font-semibold">s(down)</span>+<span className="text-emerald-400 font-semibold">s(up)</span>)</p>
+                <p className="text-center font-light text-white leading-relaxed tracking-tight text-[14px]">When Steeply Sloped (2x<span className="text-orange-400 font-semibold">s(down)</span> x <span className="text-emerald-400 font-semibold">s(up)</span>)÷(<span className="text-orange-400 font-semibold">s(down)</span>+<span className="text-emerald-400 font-semibold">s(up)</span>)</p>
               </div>
             </div>
           )}
