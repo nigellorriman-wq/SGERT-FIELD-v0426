@@ -44,7 +44,8 @@ import {
   Search,
   ChartSpline,
   MousePointer2,
-  Maximize2
+  Maximize2,
+  Compass
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -57,7 +58,7 @@ import html2canvas from 'html2canvas';
 
 /** --- TYPES --- **/
 // Fix: Renamed View to AppView to resolve "Cannot find name 'AppView'" errors on lines 839 and 1069
-export type AppView = 'landing' | 'track' | 'green' | 'manual' | 'stimp' | 'report';
+export type AppView = 'landing' | 'track' | 'green' | 'manual' | 'stimp' | 'report' | 'bunker';
 export type UnitSystem = 'Yards' | 'Metres';
 export type FontSize = 'small' | 'medium' | 'large';
 export type RatingGender = 'Men' | 'Women'; 
@@ -1253,6 +1254,527 @@ const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+};
+
+const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [activeTab, setActiveTab] = useState<'stimp' | 'eye' | 'step'>('stimp');
+  
+  // App-wide calibrations
+  const [eyeHeight, setEyeHeight] = useState<number>(5.5); // Default rater eye height
+  const [unitSystem, setUnitSystem] = useState<'Imperial' | 'Metric'>('Imperial');
+
+  // Device orientation / Live tilt state
+  const [liveAngle, setLiveAngle] = useState<number>(0);
+  const [sensorsActive, setSensorsActive] = useState<boolean>(false);
+  const [sensorFeedback, setSensorFeedback] = useState<string | null>(null);
+
+  // Method 1: Stimpmeter
+  const [stimpSubMode, setStimpSubMode] = useState<'slope' | 'distance'>('slope');
+  const [stimpSlopeAngle, setStimpSlopeAngle] = useState<number>(35); // Degrees
+  const [stimpAngleRef, setStimpAngleRef] = useState<number>(15); // θ1 to top of stimp
+  const [stimpAngleLip, setStimpAngleLip] = useState<number>(40); // θ2 to top of lip
+
+  // Method 2: Eye-Height
+  const [eyeSubMode, setEyeSubMode] = useState<'bottom_up' | 'top_down'>('bottom_up');
+  const [eyeDistance, setEyeDistance] = useState<number>(4.0); // estimated distance in feet
+  const [eyeAngle, setEyeAngle] = useState<number>(30); // elevation/depression angle
+
+  // Method 3: Step-Back
+  const [stepDistance, setStepDistance] = useState<number>(3.0); // distance of one step (ft)
+  const [stepAngle1, setStepAngle1] = useState<number>(45); // close elevation angle
+  const [stepAngle2, setStepAngle2] = useState<number>(25); // stepped-back elevation angle
+
+  // Handle device orientation for live tilt reading
+  useEffect(() => {
+    if (!sensorsActive) return;
+
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      if (e.beta !== null) {
+        const pitchVal = Math.min(90, Math.max(0, Math.round(Math.abs(e.beta))));
+        setLiveAngle(pitchVal);
+      }
+    };
+
+    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+      (DeviceOrientationEvent as any).requestPermission()
+        .then((resp: string) => {
+          if (resp === 'granted') {
+            window.addEventListener('deviceorientation', handleOrientation);
+          } else {
+            setSensorFeedback("Permission denied. Input manually below.");
+            setSensorsActive(false);
+          }
+        })
+        .catch(() => {
+          setSensorFeedback("Sensor restricted. Input manually.");
+          setSensorsActive(false);
+        });
+    } else {
+      window.addEventListener('deviceorientation', handleOrientation);
+    }
+
+    return () => {
+      window.removeEventListener('deviceorientation', handleOrientation);
+    };
+  }, [sensorsActive]);
+
+  const startListening = async () => {
+    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+      try {
+        const permission = await (DeviceOrientationEvent as any).requestPermission();
+        if (permission === 'granted') {
+          setSensorsActive(true);
+        } else {
+          setSensorFeedback("Permission denied. Input manually.");
+        }
+      } catch (err) {
+        setSensorFeedback("Sensor error. Input manually.");
+      }
+    } else {
+      setSensorsActive(true);
+    }
+  };
+
+  // Calculations
+  const calculateDepth = (): { depthFeet: number; explanation: string; warning?: string } => {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+
+    if (activeTab === 'stimp') {
+      if (stimpSubMode === 'slope') {
+        const d = 3.0 * Math.sin(toRad(stimpSlopeAngle));
+        return {
+          depthFeet: d,
+          explanation: `Using the 3-foot Stimpmeter laid along the sloping wall. Calculated as 3.0 × sin(${stimpSlopeAngle}°).`
+        };
+      } else {
+        if (stimpAngleRef <= 0) {
+          return { depthFeet: 0, explanation: "Stimpmeter angle must be positive.", warning: "Angle to Stimpmeter top should be > 0°" };
+        }
+        if (stimpAngleLip < stimpAngleRef) {
+          return { depthFeet: 0, explanation: "Lip angle should be greater than Stimpmeter angle.", warning: "Lip angle must exceed Stimpmeter angle." };
+        }
+        const d = 3.0 * (Math.tan(toRad(stimpAngleLip)) / Math.tan(toRad(stimpAngleRef)));
+        return {
+          depthFeet: d,
+          explanation: `Dual angle reference using vertical 3.0' Stimpmeter. Estimated horizontal distance is ${(3.0 / Math.tan(toRad(stimpAngleRef))).toFixed(1)} feet.`
+        };
+      }
+    } else if (activeTab === 'eye') {
+      if (eyeSubMode === 'bottom_up') {
+        const d = eyeHeight + (eyeDistance * Math.tan(toRad(eyeAngle)));
+        return {
+          depthFeet: d,
+          explanation: `Standing inside looking up. Total depth = Eye Height (${eyeHeight}') + (Estimated Distance ${eyeDistance}' × tan(${eyeAngle}°)).`
+        };
+      } else {
+        const d = (eyeDistance * Math.tan(toRad(eyeAngle))) - eyeHeight;
+        if (d < 0) {
+          return {
+            depthFeet: 0,
+            explanation: `Standing on lip looking down. Depth is within rater's eye-height level.`,
+            warning: "Depression angle is too shallow to calculate depth above your eye level."
+          };
+        }
+        return {
+          depthFeet: d,
+          explanation: `Standing on top lip looking down. Depth = (Estimated Distance ${eyeDistance}' × tan(${eyeAngle}°)) - Eye Height (${eyeHeight}').`
+        };
+      }
+    } else {
+      if (stepAngle1 <= stepAngle2) {
+        return {
+          depthFeet: 0,
+          explanation: "The closer angle must be steeper (greater) than the stepped-back angle.",
+          warning: "Sighting 1 angle must be greater than Sighting 2 angle."
+        };
+      }
+      const num = Math.tan(toRad(stepAngle1)) * Math.tan(toRad(stepAngle2));
+      const den = Math.tan(toRad(stepAngle1)) - Math.tan(toRad(stepAngle2));
+      const h_lip = stepDistance * (num / den);
+      const totalH = eyeHeight + h_lip;
+      return {
+        depthFeet: totalH,
+        explanation: `Step-Back calculation. Lip height above eye level is ${h_lip.toFixed(1)}'. Total depth = Eye Height + Lip height.`
+      };
+    }
+  };
+
+  const { depthFeet, explanation, warning } = calculateDepth();
+
+  const formatDepth = (val: number) => {
+    if (unitSystem === 'Metric') {
+      const metres = val * 0.3048;
+      return `${metres.toFixed(2)} m`;
+    }
+    const ft = Math.floor(val);
+    const inches = Math.round((val - ft) * 12);
+    if (inches === 12) return `${ft + 1}' 0"`;
+    return `${ft}' ${inches}"`;
+  };
+
+  const getBunkerClassification = (val: number) => {
+    if (val <= 0) return { title: "Flat Sand", color: "text-slate-400", desc: "No significant depth." };
+    if (val < 2.0) return { title: "Shallow / Easy", color: "text-emerald-400", desc: "Easily walked out. Classic lob shot, low penalty risk." };
+    if (val < 4.0) return { title: "Standard Pot", color: "text-amber-400", desc: "Moderate challenge. Requires vertical lofted wedge. Sod/grass lip present." };
+    if (val < 6.0) return { title: "Severe Deep Face", color: "text-orange-400", desc: "High penalty hazard. Extremely vertical revetted face. Bogey player risk extreme." };
+    return { title: "Abyssal Scottish Pit", color: "text-red-500", desc: "Legendary hazard depth. Escape can require playing backward or high-risk pop shots." };
+  };
+
+  const classification = getBunkerClassification(depthFeet);
+
+  const adjustVal = (curr: number, set: (v: number) => void, step: number, min: number, max: number) => {
+    const next = Number((curr + step).toFixed(1));
+    if (next >= min && next <= max) set(next);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[2000] bg-[#020617] flex flex-col p-4 overflow-y-auto no-scrollbar">
+      {/* Header */}
+      <div className="relative flex items-center justify-center mb-4 mt-2 h-[46px]">
+        <button 
+          onClick={onClose} 
+          className="absolute left-0 bg-slate-800 border border-white/20 w-[46px] h-[46px] rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all text-white font-bold"
+          title="Home"
+        >
+          <Home size={20} className="text-white" />
+        </button>
+        <h1 className="text-2xl sm:text-3xl tracking-tighter font-semibold text-amber-500 text-center px-12">Bunker Depth Calc</h1>
+      </div>
+      
+      <div className="flex flex-col items-center mb-4">
+        <p className="text-white text-[9px] font-black uppercase tracking-widest text-center">Bunker Sighting & Depth Estimator</p>
+      </div>
+
+      {/* Method Tabs */}
+      <div className="grid grid-cols-3 gap-1 bg-slate-900/80 p-1 rounded-2xl border border-white/5 mb-4">
+        <button 
+          onClick={() => { setActiveTab('stimp'); setSensorsActive(false); }} 
+          className={`py-3 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider text-center transition-all ${activeTab === 'stimp' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+        >
+          1. Stimpmeter
+        </button>
+        <button 
+          onClick={() => { setActiveTab('eye'); setSensorsActive(false); }} 
+          className={`py-3 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider text-center transition-all ${activeTab === 'eye' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+        >
+          2. Eye-Height
+        </button>
+        <button 
+          onClick={() => { setActiveTab('step'); setSensorsActive(false); }} 
+          className={`py-3 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider text-center transition-all ${activeTab === 'step' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+        >
+          3. Step-Back
+        </button>
+      </div>
+
+      {/* Global Config (Eye Height & Unit System) */}
+      <div className="bg-slate-900/50 border border-white/5 rounded-[1.5rem] p-3 mb-4 grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Rater Eye Height</label>
+          <div className="flex items-center gap-2">
+            <span className="text-white font-mono text-sm font-bold">{eyeHeight.toFixed(1)}' ft</span>
+            <input 
+              type="range" 
+              min="4.5" 
+              max="7.0" 
+              step="0.1" 
+              value={eyeHeight} 
+              onChange={(e) => setEyeHeight(parseFloat(e.target.value))}
+              className="flex-1 accent-amber-500 h-1 bg-slate-800 rounded-lg appearance-none"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Unit Output</label>
+          <div className="grid grid-cols-2 gap-1 bg-slate-950 p-0.5 rounded-lg border border-white/5">
+            <button onClick={() => setUnitSystem('Imperial')} className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Imperial' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}>Ft / In</button>
+            <button onClick={() => setUnitSystem('Metric')} className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Metric' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}>Metres</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Real-time angle reader tool (Sentry panel) */}
+      <div className="bg-slate-950/80 border border-amber-600/20 rounded-[1.5rem] p-4 mb-4 flex flex-col items-center">
+        <div className="flex justify-between items-center w-full mb-2">
+          <div className="flex items-center gap-2">
+            <div className={`w-2.5 h-2.5 rounded-full ${sensorsActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Live Sighting Clinometer</span>
+          </div>
+          <button 
+            onClick={() => {
+              if (sensorsActive) {
+                setSensorsActive(false);
+              } else {
+                startListening();
+              }
+            }}
+            className={`py-1 px-3 text-[10px] font-bold uppercase rounded-full border transition-all ${sensorsActive ? 'bg-red-500/10 border-red-500/40 text-red-400' : 'bg-amber-600/20 border-amber-500/40 text-amber-400'}`}
+          >
+            {sensorsActive ? "Turn Off" : "Turn On Sensor"}
+          </button>
+        </div>
+        
+        {sensorFeedback && <p className="text-[10px] text-rose-400 font-semibold mb-2">{sensorFeedback}</p>}
+
+        <div className="flex items-center gap-6 w-full justify-center py-2">
+          {/* Clinometer graphic dial representation */}
+          <div className="relative w-16 h-16 rounded-full border-2 border-slate-800 flex items-center justify-center bg-slate-900/60 overflow-hidden">
+            <div 
+              className="absolute w-12 h-1 bg-amber-500 rounded-full transition-transform duration-100"
+              style={{ transform: `rotate(${liveAngle}deg)` }}
+            />
+            <span className="relative z-10 font-mono text-xs font-black text-white bg-slate-950 px-1 rounded">{liveAngle}°</span>
+          </div>
+
+          <div className="flex flex-col gap-1 flex-1">
+            <span className="text-[10px] text-slate-400 leading-tight">Tilt phone to target sight-line. Match level horizontal with your target depth.</span>
+            {sensorsActive && (
+              <div className="flex flex-wrap gap-2 mt-1">
+                {activeTab === 'stimp' && stimpSubMode === 'slope' && (
+                  <button onClick={() => setStimpSlopeAngle(liveAngle)} className="bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-bold px-2 py-1 rounded">Set Slope Angle</button>
+                )}
+                {activeTab === 'stimp' && stimpSubMode === 'distance' && (
+                  <div className="flex gap-1">
+                    <button onClick={() => setStimpAngleRef(liveAngle)} className="bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-bold px-2 py-1 rounded">Set Ref Angle</button>
+                    <button onClick={() => setStimpAngleLip(liveAngle)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-bold px-2 py-1 rounded">Set Lip Angle</button>
+                  </div>
+                )}
+                {activeTab === 'eye' && (
+                  <button onClick={() => setEyeAngle(liveAngle)} className="bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-bold px-2 py-1 rounded font-black font-mono">Set Sighting</button>
+                )}
+                {activeTab === 'step' && (
+                  <div className="flex gap-1">
+                    <button onClick={() => setStepAngle1(liveAngle)} className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold px-2 py-1 rounded font-black font-mono">Set Scope 1</button>
+                    <button onClick={() => setStepAngle2(liveAngle)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold px-2 py-1 rounded font-black font-mono">Set Scope 2</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Interactive Work Area */}
+      <div className="bg-slate-900/30 border border-white/5 rounded-[1.8rem] p-4 flex-1 flex flex-col gap-4">
+        
+        {/* Method 1: Stimpmeter (3ft length) */}
+        {activeTab === 'stimp' && (
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl">
+              <button 
+                onClick={() => setStimpSubMode('slope')} 
+                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${stimpSubMode === 'slope' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+              >
+                Laid Flat on Face
+              </button>
+              <button 
+                onClick={() => setStimpSubMode('distance')} 
+                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${stimpSubMode === 'distance' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+              >
+                Dual Angle Sight
+              </button>
+            </div>
+
+            {stimpSubMode === 'slope' ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-[11px] text-slate-300 leading-normal mb-1">
+                  Place the 36-inch (3.0ft) Stimpmeter directly along the steepest face of the bunker wall. Enter the inclination angle from horizontal.
+                </p>
+                <div className="bg-slate-900/60 p-4 rounded-2xl flex flex-col items-center">
+                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-2">Slope Angle (Degrees)</span>
+                  <div className="flex items-center gap-4 w-full justify-between">
+                    <button onClick={() => adjustVal(stimpSlopeAngle, setStimpSlopeAngle, -1, 0, 90)} className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-white active:bg-slate-700 font-bold">-</button>
+                    <span className="text-3xl font-black text-white font-mono">{stimpSlopeAngle}°</span>
+                    <button onClick={() => adjustVal(stimpSlopeAngle, setStimpSlopeAngle, 1, 0, 90)} className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-white active:bg-slate-700 font-bold">+</button>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="1" 
+                    max="90" 
+                    value={stimpSlopeAngle} 
+                    onChange={(e) => setStimpSlopeAngle(parseInt(e.target.value))}
+                    className="w-full mt-4 accent-amber-500"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <p className="text-[11px] text-slate-300 leading-normal text-center">
+                  Stand the 3.0ft Stimpmeter vertically at the bottom. Stand back. Sight the top of the Stimpmeter (θ1) and the top of the bunker lip (θ2).
+                </p>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center">
+                    <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider text-center block mb-1">Stimp Top Angle (θ1)</span>
+                    <span className="text-2xl font-black text-white font-mono mb-2">{stimpAngleRef}°</span>
+                    <div className="flex gap-2">
+                      <button onClick={() => adjustVal(stimpAngleRef, setStimpAngleRef, -1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
+                      <button onClick={() => adjustVal(stimpAngleRef, setStimpAngleRef, 1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center">
+                    <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider text-center block mb-1">Bunker Lip Angle (θ2)</span>
+                    <span className="text-2xl font-black text-white font-mono mb-2">{stimpAngleLip}°</span>
+                    <div className="flex gap-2">
+                      <button onClick={() => adjustVal(stimpAngleLip, setStimpAngleLip, -1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
+                      <button onClick={() => adjustVal(stimpAngleLip, setStimpAngleLip, 1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Method 2: Eye-Height */}
+        {activeTab === 'eye' && (
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl">
+              <button 
+                onClick={() => setEyeSubMode('bottom_up')} 
+                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${eyeSubMode === 'bottom_up' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+              >
+                At Bottom, Look Up
+              </button>
+              <button 
+                onClick={() => setEyeSubMode('top_down')} 
+                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${eyeSubMode === 'top_down' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+              >
+                On Lip, Look Down
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-300 leading-normal text-center">
+              {eyeSubMode === 'bottom_up' 
+                ? "Stand in bottom of bunker. Estimate horizontal distance separation and sight the top of the lip." 
+                : "Stand at the top of the lip. Estimate horizontal separation to deepest sand point and sight downward."
+              }
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center animate-in fade-in duration-300">
+                <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider block mb-1">Separation Dist</span>
+                <span className="text-2xl font-black text-white font-mono mb-1">{eyeDistance.toFixed(1)}' ft</span>
+                <div className="flex gap-2 mb-2">
+                  <button onClick={() => adjustVal(eyeDistance, setEyeDistance, -0.5, 1.0, 25.0)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
+                  <button onClick={() => adjustVal(eyeDistance, setEyeDistance, 0.5, 1.0, 25.0)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
+                </div>
+                <input 
+                  type="range" 
+                  min="1.0" 
+                  max="25.0" 
+                  step="0.5"
+                  value={eyeDistance} 
+                  onChange={(e) => setEyeDistance(parseFloat(e.target.value))}
+                  className="w-full accent-amber-500" 
+                />
+              </div>
+
+              <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center animate-in fade-in duration-300">
+                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider block mb-1">Tilt Angle (θ)</span>
+                <span className="text-2xl font-black text-white font-mono mb-1">{eyeAngle}°</span>
+                <div className="flex gap-2 mb-2">
+                  <button onClick={() => adjustVal(eyeAngle, setEyeAngle, -1, 0, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
+                  <button onClick={() => adjustVal(eyeAngle, setEyeAngle, 1, 0, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="89" 
+                  value={eyeAngle} 
+                  onChange={(e) => setEyeAngle(parseInt(e.target.value))}
+                  className="w-full accent-emerald-500" 
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Method 3: Step-Back */}
+        {activeTab === 'step' && (
+          <div className="flex flex-col gap-4">
+            <p className="text-[11px] text-slate-300 leading-normal text-center">
+              Stand inside looking up. Measure closer angle (θ1). Step back 1 standard pace (e.g. 3ft) and measure far angle (θ2). No distance guess required!
+            </p>
+
+            <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center mb-1">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">One Pace Step Distance</span>
+              <div className="flex items-center gap-4">
+                <button onClick={() => adjustVal(stepDistance, setStepDistance, -0.5, 1.5, 5.0)} className="w-8 h-8 bg-slate-800 rounded-full text-white font-bold flex items-center justify-center">-</button>
+                <span className="text-xl font-bold font-mono text-white">{stepDistance.toFixed(1)} feet</span>
+                <button onClick={() => adjustVal(stepDistance, setStepDistance, 0.5, 1.5, 5.0)} className="w-8 h-8 bg-slate-800 rounded-full text-white font-bold flex items-center justify-center">+</button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center">
+                <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider text-center block mb-1">Sighting 1 (Close θ1)</span>
+                <span className="text-2xl font-black text-white font-mono mb-2">{stepAngle1}°</span>
+                <div className="flex gap-2">
+                  <button onClick={() => adjustVal(stepAngle1, setStepAngle1, -1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
+                  <button onClick={() => adjustVal(stepAngle1, setStepAngle1, 1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center">
+                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider text-center block mb-1">Sighting 2 (Back θ2)</span>
+                <span className="text-2xl font-black text-white font-mono mb-2">{stepAngle2}°</span>
+                <div className="flex gap-2">
+                  <button onClick={() => adjustVal(stepAngle2, setStepAngle2, -1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
+                  <button onClick={() => adjustVal(stepAngle2, setStepAngle2, 1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dynamic Warning Message */}
+        {warning && (
+          <div className="bg-rose-950/40 border border-rose-500/30 p-3 rounded-2xl flex items-center gap-2 mt-2">
+            <AlertCircle size={16} className="text-rose-400 shrink-0" />
+            <span className="text-[10px] text-rose-300 font-bold leading-tight">{warning}</span>
+          </div>
+        )}
+
+        {/* Calculated Results Area */}
+        <div className="mt-auto pt-4 border-t border-white/5 flex flex-col gap-3">
+          <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span>Resulting Bunker Depth</span>
+            <span>Est. playability</span>
+          </div>
+
+          <div className="bg-[#0b1329] border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+            {depthFeet > 0 ? (
+              <div className="flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+                <span className="text-[10px] uppercase font-black text-slate-300 mb-1 tracking-wider">Vertical Depth</span>
+                <span className="text-5xl font-black text-amber-500 tracking-tight font-mono mb-2">
+                  {formatDepth(depthFeet)}
+                </span>
+                
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/80 mb-2 border border-white/5">
+                  <span className={`text-[10px] font-black uppercase ${classification.color}`}>{classification.title}</span>
+                </div>
+                <p className="text-[11px] text-slate-400 max-w-[280px] leading-relaxed mb-2">{classification.desc}</p>
+                <div className="text-[10px] text-slate-500 bg-slate-950/40 p-2 rounded-lg font-mono">
+                  {explanation}
+                </div>
+              </div>
+            ) : (
+              <div className="py-4 text-center text-slate-500 font-medium text-xs">
+                Enter or capture sighting values above to calculate deep bunker vertical heights.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Informative citation about pot bunkers */}
+      <div className="mt-4 text-center opacity-60 text-[9px] text-slate-400 pb-2">
+        A USGA standard Stimpmeter is exactly 3.0 feet long and provides an exceptional physical yardstick.
       </div>
     </div>
   );
@@ -2728,6 +3250,11 @@ const App: React.FC = () => {
               <h2 className="text-2xl font-bold mb-2 uppercase text-emerald-500">Green Speed Calc</h2>
               <p className="text-white text-[13px] font-medium text-center max-w-[220px]">Green Surface Rating calculator</p>
             </button>
+            <button onClick={() => { setViewingRecord(null); setView('bunker'); }} className="bg-slate-900 border border-white/5 rounded-[2.5rem] p-10 flex flex-col items-center justify-center shadow-2xl active:scale-95 transition-all animate-fade-in">
+              <div className="w-16 h-16 bg-amber-600 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-amber-600/40"><Compass size={28} /></div>
+              <h2 className="text-2xl font-bold mb-2 uppercase text-amber-500">Bunker Depth Calc</h2>
+              <p className="text-white text-[13px] font-medium text-center max-w-[220px]">Pot bunker height & depth calculator</p>
+            </button>
             <button onClick={() => setView('manual')} className="mt-2 bg-slate-800/50 border border-white/10 rounded-[1.8rem] py-6 flex items-center justify-center gap-4 active:bg-slate-700 transition-colors">
               <BookOpen size={20} className="text-blue-400" />
               <span className="text-[13px] font-bold uppercase tracking-widest text-white">User Manual</span>
@@ -2771,6 +3298,8 @@ const App: React.FC = () => {
         </div>
       ) : view === 'manual' ? (
         <UserManual onClose={() => setView('landing')} />
+      ) : view === 'bunker' ? (
+        <BunkerDepthCalculator onClose={() => setView('landing')} />
       ) : view === 'stimp' ? (
         <StimpCalculator onClose={() => setView('landing')} />
       ) : view === 'report' ? (
