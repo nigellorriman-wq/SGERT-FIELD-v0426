@@ -1072,9 +1072,9 @@ const RATING_TABLE: Record<string, { scratch: number; bogey: number }[]> = {
 };
 
 const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [sDownFt, setSDownFt] = useState(0);
+  const [sDownFt, setSDownFt] = useState(8);
   const [sDownIn, setSDownIn] = useState(0);
-  const [sUpFt, setSUpFt] = useState(0);
+  const [sUpFt, setSUpFt] = useState(8);
   const [sUpIn, setSUpIn] = useState(0);
   const [result, setResult] = useState<number | null>(null);
   const [slopeCat, setSlopeCat] = useState<string | null>(null);
@@ -1145,15 +1145,15 @@ const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   };
   return (
     <div className="fixed inset-0 z-[2000] bg-[#020617] flex flex-col p-4 overflow-y-auto no-scrollbar">
-      <div className="flex justify-between items-center mb-4 mt-2">
-<button 
+      <div className="relative flex items-center justify-center mb-4 mt-2 h-[46px]">
+        <button 
           onClick={onClose} 
-          className="bg-slate-800 border border-white/20 w-[46px] h-[46px] rounded-full flex flex-center shadow-2xl active:scale-95 transition-all text-white flex items-center justify-center font-bold"
+          className="absolute left-0 bg-slate-800 border border-white/20 w-[46px] h-[46px] rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all text-white font-bold"
           title="Home"
         >
           <Home size={20} className="text-white" />
         </button>
-        <h1 className="text-3xl tracking-tighter font-semibold text-blue-500">Green Speed Calc</h1>
+        <h1 className="text-2xl sm:text-3xl tracking-tighter font-semibold text-blue-500 text-center px-12">Green Speed Calc</h1>
       </div>
       <div className="flex flex-col items-center mb-6">
         <p className="text-white text-[9px] font-black uppercase tracking-widest text-center">Green Surface Rating calculator</p>
