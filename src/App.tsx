@@ -1318,11 +1318,17 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
   const [stepAngle2, setStepAngle2] = useState<number>(25); // stepped-back elevation angle
 
   const [isLandscape, setIsLandscape] = useState<boolean>(false);
+  const [isMobileLandscape, setIsMobileLandscape] = useState<boolean>(false);
 
   // Monitor screen layout/orientation and try holding portrait mode lock when sighter is active
   useEffect(() => {
     const checkOrientation = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
+      const landscape = window.innerWidth > window.innerHeight;
+      setIsLandscape(landscape);
+
+      const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      const isSmallHeight = window.innerHeight < 550;
+      setIsMobileLandscape(landscape && (isTouch || isSmallHeight || window.innerWidth < 850));
     };
     checkOrientation();
     window.addEventListener('resize', checkOrientation);
@@ -1426,12 +1432,17 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
   }, [sightingCountdown, sightingTarget, liveAngle]);
 
   const saveAngleValue = (target: string, value: number) => {
-    if (target === 'stimpSlopeAngle') setStimpSlopeAngle(value);
-    else if (target === 'stimpAngleRef') setStimpAngleRef(value);
-    else if (target === 'stimpAngleLip') setStimpAngleLip(value);
-    else if (target === 'eyeAngle') setEyeAngle(value);
-    else if (target === 'stepAngle1') setStepAngle1(value);
-    else if (target === 'stepAngle2') setStepAngle2(value);
+    if (target === 'stimpSlopeAngle') {
+      setStimpSlopeAngle(value);
+    } else {
+      // Sighting angles are computed relative to the vertical 90-degree level plane
+      const physicalAngle = Math.max(0, Math.min(89, 90 - value));
+      if (target === 'stimpAngleRef') setStimpAngleRef(physicalAngle);
+      else if (target === 'stimpAngleLip') setStimpAngleLip(physicalAngle);
+      else if (target === 'eyeAngle') setEyeAngle(physicalAngle);
+      else if (target === 'stepAngle1') setStepAngle1(physicalAngle);
+      else if (target === 'stepAngle2') setStepAngle2(physicalAngle);
+    }
   };
 
   const launchSighter = async (target: 'stimpSlopeAngle' | 'stimpAngleRef' | 'stimpAngleLip' | 'eyeAngle' | 'stepAngle1' | 'stepAngle2') => {
@@ -1477,6 +1488,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
   const calculateDepth = (): { depthFeet: number; explanation: string; warning?: string } => {
     const toRad = (deg: number) => (deg * Math.PI) / 180;
     const eyeHeightInFeet = unitSystem === 'Metric' ? eyeHeight / 0.3048 : eyeHeight;
+    const eyeDistanceInFeet = unitSystem === 'Metric' ? eyeDistance / 0.3048 : eyeDistance;
 
     if (activeTab === 'stimp') {
       if (stimpSubMode === 'slope') {
@@ -1500,13 +1512,13 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       }
     } else if (activeTab === 'eye') {
       if (eyeSubMode === 'bottom_up') {
-        const d = eyeHeightInFeet + (eyeDistance * Math.tan(toRad(eyeAngle)));
+        const d = eyeHeightInFeet + (eyeDistanceInFeet * Math.tan(toRad(eyeAngle)));
         return {
           depthFeet: d,
-          explanation: `Standing inside looking up. Total depth = Eye Height (${formatEyeHeight(eyeHeight)}) + (Estimated Distance ${eyeDistance}' × tan(${eyeAngle}°)).`
+          explanation: `Standing inside looking up. Total depth = Eye Height (${formatEyeHeight(eyeHeight)}) + (Estimated Distance ${unitSystem === 'Metric' ? `${eyeDistance.toFixed(1)}m` : `${eyeDistance}'`} × tan(${eyeAngle}°)).`
         };
       } else {
-        const d = (eyeDistance * Math.tan(toRad(eyeAngle))) - eyeHeightInFeet;
+        const d = (eyeDistanceInFeet * Math.tan(toRad(eyeAngle))) - eyeHeightInFeet;
         if (d < 0) {
           return {
             depthFeet: 0,
@@ -1516,7 +1528,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
         }
         return {
           depthFeet: d,
-          explanation: `Standing on top lip looking down. Depth = (Estimated Distance ${eyeDistance}' × tan(${eyeAngle}°)) - Eye Height (${formatEyeHeight(eyeHeight)}).`
+          explanation: `Standing on top lip looking down. Depth = (Estimated Distance ${unitSystem === 'Metric' ? `${eyeDistance.toFixed(1)}m` : `${eyeDistance}'`} × tan(${eyeAngle}°)) - Eye Height (${formatEyeHeight(eyeHeight)}).`
         };
       }
     } else {
@@ -1632,6 +1644,8 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                   setUnitSystem('Imperial');
                   const converted = eyeHeight / 0.3048;
                   setEyeHeight(Math.min(7.0, Math.max(4.5, Math.round(converted * 12) / 12)));
+                  const convertedDist = eyeDistance / 0.3048;
+                  setEyeDistance(Math.min(25.0, Math.max(1.0, Math.round(convertedDist * 2) / 2)));
                 }
               }} 
               className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Imperial' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
@@ -1644,6 +1658,8 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                   setUnitSystem('Metric');
                   const converted = eyeHeight * 0.3048;
                   setEyeHeight(Math.min(2.15, Math.max(1.35, Math.round(converted * 100) / 100)));
+                  const convertedDist = eyeDistance * 0.3048;
+                  setEyeDistance(Math.min(8.0, Math.max(0.3, Math.round(convertedDist * 10) / 10)));
                 }
               }} 
               className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Metric' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
@@ -1826,16 +1842,28 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center animate-in fade-in duration-300">
                 <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider block mb-1">Separation Dist</span>
-                <span className="text-2xl font-black text-white font-mono mb-1">{eyeDistance.toFixed(1)}' ft</span>
+                <span className="text-2xl font-black text-white font-mono mb-1">
+                  {unitSystem === 'Metric' ? `${eyeDistance.toFixed(1)} m` : `${eyeDistance.toFixed(1)}' ft`}
+                </span>
                 <div className="flex gap-2 mb-2">
-                  <button onClick={() => adjustVal(eyeDistance, setEyeDistance, -0.5, 1.0, 25.0)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
-                  <button onClick={() => adjustVal(eyeDistance, setEyeDistance, 0.5, 1.0, 25.0)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
+                  <button 
+                    onClick={() => adjustVal(eyeDistance, setEyeDistance, unitSystem === 'Metric' ? -0.1 : -0.5, unitSystem === 'Metric' ? 0.3 : 1.0, unitSystem === 'Metric' ? 8.0 : 25.0)} 
+                    className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center"
+                  >
+                    -
+                  </button>
+                  <button 
+                    onClick={() => adjustVal(eyeDistance, setEyeDistance, unitSystem === 'Metric' ? 0.1 : 0.5, unitSystem === 'Metric' ? 0.3 : 1.0, unitSystem === 'Metric' ? 8.0 : 25.0)} 
+                    className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center"
+                  >
+                    +
+                  </button>
                 </div>
                 <input 
                   type="range" 
-                  min="1.0" 
-                  max="25.0" 
-                  step="0.5"
+                  min={unitSystem === 'Metric' ? "0.3" : "1.0"} 
+                  max={unitSystem === 'Metric' ? "8.0" : "25.0"} 
+                  step={unitSystem === 'Metric' ? "0.1" : "0.5"}
                   value={eyeDistance} 
                   onChange={(e) => setEyeDistance(parseFloat(e.target.value))}
                   className="w-full accent-amber-500" 
@@ -1996,8 +2024,17 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
             )}
 
             <div className="bg-slate-900 border border-white/5 p-6 rounded-3xl w-full flex flex-col items-center gap-1.5 shadow-2xl">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Angle Reading</span>
-              <span className="text-6xl font-black text-white font-mono">{liveAngle}°</span>
+              <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
+                {sightingTarget === 'stimpSlopeAngle' ? "Live Slope Angle" : "Live Sighting Angle (θ)"}
+              </span>
+              <span className="text-6xl font-black text-white font-mono">
+                {sightingTarget === 'stimpSlopeAngle' ? liveAngle : Math.max(0, 90 - liveAngle)}°
+              </span>
+              {sightingTarget !== 'stimpSlopeAngle' && (
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
+                  Raw Sensor: {liveAngle}° pitch (90° = vertical level)
+                </span>
+              )}
               
               {!isLandscape && isStable && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[10px] text-emerald-400 font-extrabold uppercase animate-pulse mt-1">
@@ -2544,6 +2581,23 @@ const App: React.FC = () => {
   const [ratingGender, setRatingGender] = useState<RatingGender>('Men');
   const [teebox, setTeebox] = useState<string>('White');
   const [showPivotMenu, setShowPivotMenu] = useState(false);
+  const [isMobileLandscape, setIsMobileLandscape] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const landscape = window.innerWidth > window.innerHeight;
+      const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      const isSmallHeight = window.innerHeight < 550;
+      setIsMobileLandscape(landscape && (isTouch || isSmallHeight || window.innerWidth < 850));
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
 
   const getTeeboxStyle = (color: string) => {
     switch (color) {
@@ -3455,6 +3509,29 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full w-full bg-[#020617] text-white overflow-hidden absolute inset-0 font-sans">
+      {isMobileLandscape && (
+        <div className="fixed inset-0 z-[99999] bg-[#020617] flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-300">
+          <div className="max-w-md flex flex-col items-center gap-5">
+            <div className="w-16 h-16 rounded-full border-4 border-amber-500 flex items-center justify-center bg-amber-500/10 animate-[spin_5s_linear_infinite]">
+              <RotateCcw className="text-amber-400" size={32} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <h2 className="text-2xl font-black text-white">Portrait Mode Required</h2>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                Device Rotation Warning
+              </p>
+            </div>
+            <div className="bg-slate-900 border border-white/5 p-6 rounded-3xl w-full flex flex-col items-center gap-3 shadow-2xl">
+              <p className="text-xs text-white font-medium leading-relaxed">
+                This toolkit and its clinometer sighting components are designed exclusively for upright, vertical use.
+              </p>
+              <p className="text-[11px] text-amber-400 font-bold leading-normal">
+                Please rotate your mobile device or resize your screen back to Portrait Orientation to continue.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="h-[env(safe-area-inset-top)] bg-[#0f172a] shrink-0"></div>
       {view === 'landing' ? (
         <div className="flex-1 flex flex-col p-6 overflow-y-auto no-scrollbar animate-in fade-in duration-700">
