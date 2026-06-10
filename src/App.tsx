@@ -1317,6 +1317,44 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
   const [stepAngle1, setStepAngle1] = useState<number>(45); // close elevation angle
   const [stepAngle2, setStepAngle2] = useState<number>(25); // stepped-back elevation angle
 
+  const [isLandscape, setIsLandscape] = useState<boolean>(false);
+
+  // Monitor screen layout/orientation and try holding portrait mode lock when sighter is active
+  useEffect(() => {
+    const checkOrientation = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+
+    if (sightingTarget) {
+      if (screen && screen.orientation && typeof (screen.orientation as any).lock === 'function') {
+        (screen.orientation as any).lock('portrait-primary').catch(() => {});
+      }
+    } else {
+      if (screen && screen.orientation && typeof (screen.orientation as any).unlock === 'function') {
+        try {
+          (screen.orientation as any).unlock();
+        } catch {
+          // Ignore
+        }
+      }
+    }
+
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+      if (screen && screen.orientation && typeof (screen.orientation as any).unlock === 'function') {
+        try {
+          (screen.orientation as any).unlock();
+        } catch {
+          // Ignore
+        }
+      }
+    };
+  }, [sightingTarget]);
+
   // Handle device orientation for live tilt reading with stabilization tracking
   useEffect(() => {
     if (!sensorsActive) return;
@@ -1925,17 +1963,17 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
             setSightingTarget(null);
             setSightingCountdown(null);
           }}
-          className="fixed inset-0 z-[3000] bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center select-none"
+          className="fixed inset-0 z-[3000] bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200"
         >
-          <div className="max-w-md flex flex-col items-center gap-6">
-            <div className="w-20 h-20 rounded-full border-4 border-amber-500 flex items-center justify-center animate-pulse bg-amber-500/10 mb-2">
-              <Compass size={40} className="text-amber-400 rotate-12" />
+          <div className="max-w-md w-full flex flex-col items-center gap-5">
+            <div className="w-16 h-16 rounded-full border-4 border-amber-500 flex items-center justify-center animate-pulse bg-amber-500/10">
+              <Compass size={32} className="text-amber-400 rotate-12" />
             </div>
             
             <div className="flex flex-col gap-1">
               <span className="text-[10px] font-black tracking-widest text-amber-500 uppercase">ACTIVE COGNITIVE SIGHTING</span>
               <h2 className="text-2xl font-black text-white">Line Up & Aim Phone</h2>
-              <p className="text-xs text-slate-400 font-bold uppercase mt-1">
+              <p className="text-xs text-slate-400 font-bold uppercase mt-0.5">
                 Targeting: {
                   sightingTarget === 'stimpSlopeAngle' ? "Slope Angle" :
                   sightingTarget === 'stimpAngleRef' ? "Stimp Top Angle (θ1)" :
@@ -1947,11 +1985,21 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
               </p>
             </div>
 
+            {/* Landscape Rotation Alert */}
+            {isLandscape && (
+              <div className="bg-rose-950/70 border-2 border-rose-500 p-3.5 rounded-2xl w-full flex flex-col gap-1 animate-bounce text-left shadow-lg shadow-rose-950/50">
+                <span className="text-rose-400 font-black text-xs uppercase tracking-wider block">⚠️ ROTATION WARNING</span>
+                <span className="text-white text-[11px] font-bold leading-normal">
+                  Your phone is currently sideways (landscape). Please turn it upright to <strong>Portrait Mode</strong>. The clinometer measures pitch angles assuming you are holding the phone vertically and sighting over the top edge.
+                </span>
+              </div>
+            )}
+
             <div className="bg-slate-900 border border-white/5 p-6 rounded-3xl w-full flex flex-col items-center gap-1.5 shadow-2xl">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Angle Reading</span>
               <span className="text-6xl font-black text-white font-mono">{liveAngle}°</span>
               
-              {isStable && (
+              {!isLandscape && isStable && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[10px] text-emerald-400 font-extrabold uppercase animate-pulse mt-1">
                   ✓ SIGHT LINE STABLIZED
                 </span>
@@ -1968,9 +2016,14 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                       setSightingCountdown(5);
                       playClinometerTone(523.25, 0.1); // Warm initial beep
                     }}
-                    className="w-full max-w-xs bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-2xl shadow-xl shadow-amber-500/20 transition-all font-mono"
+                    disabled={isLandscape}
+                    className={`w-full max-w-xs font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-2xl transition-all font-mono ${
+                      isLandscape 
+                        ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed opacity-50' 
+                        : 'bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 shadow-xl shadow-amber-500/20'
+                    }`}
                   >
-                    ▶ Start 5s Countdown
+                    {isLandscape ? "Rotate upright to Start" : "▶ Start 5s Countdown"}
                   </button>
                 ) : (
                   <div className="text-4xl font-black text-white font-mono bg-slate-900 px-6 py-2 rounded-2xl border border-white/5 tracking-wider">
@@ -1979,12 +2032,19 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 )}
               </div>
 
-              <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5">
-                <p className="text-xs text-white font-medium leading-relaxed">
-                  1. Sight along the top edge of your phone like a gun-sight to aim.<br/>
-                  2. Press <strong>Start 5s Countdown</strong> above, then wait for the guide beeps to double-tone and auto-capture.<br/>
-                  <span className="text-amber-400 font-bold block mt-1.5 text-[13px]">★ Or simply TAP ANYWHERE on screen blindly to lock instantly!</span>
-                </p>
+              <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5 text-left text-xs text-white font-medium leading-relaxed">
+                <div className="flex flex-col gap-2">
+                  <p>
+                    <strong className="text-amber-400 uppercase tracking-wider text-[10px] block mb-1">🔫 Sighting Technique:</strong>
+                    Always hold phone upright vertically in <strong>Portrait Orientation</strong>. Line up and aim by sighting along the flat <strong>TOP EDGE</strong> of the phone like a gun-sight pointing at the target sand-point or lip. Do NOT use the side of the phone.
+                  </p>
+                  <p>
+                    <strong className="text-amber-400 uppercase tracking-wider text-[10px] block mb-1">📋 Sighting Steps:</strong>
+                    1. Sight along the top edge to target.<br/>
+                    2. Press <strong>Start 5s Countdown</strong> above, then hold perfectly still until the guide double-beep sounds.<br/>
+                    <span className="text-amber-300 font-bold block mt-1.5 text-[12px]">★ Or feel free to TAP ANYONE on screen blindly at any time to freeze & lock the reading instantly!</span>
+                  </p>
+                </div>
               </div>
             </div>
 
