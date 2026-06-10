@@ -1831,6 +1831,14 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
               Stand inside looking up. Measure closer angle (θ1). Step back 1 standard pace (e.g. 3ft) and measure far angle (θ2). No distance guess required!
             </p>
 
+            <div className="bg-amber-950/40 border border-amber-500/30 p-2.5 rounded-xl flex items-start gap-2 text-left">
+              <AlertCircle size={15} className="text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-[10px] text-amber-300 leading-normal font-bold">
+                <span className="text-amber-400 uppercase tracking-wide block mb-0.5">⚠️ Concave Bunker Profile Alert</span>
+                In typical bowl-shaped or concave pot-bunkers, stepping back forces you onto an elevated, uneven slope rather than a level outer plane. This changes your eye level relative to the deepest sand point and invalidates the flat-plane formula. For classic pot-bunkers, the <strong className="text-white">On Lip, Look Down</strong> or <strong className="text-white">Stimpmeter</strong> methods are highly recommended.
+              </div>
+            </div>
+
             <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center mb-1">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">One Pace Step Distance</span>
               <div className="flex items-center gap-4">
