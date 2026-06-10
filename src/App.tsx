@@ -1405,8 +1405,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       await startListening();
     }
     
-    setSightingCountdown(3);
-    playClinometerTone(523.25, 0.1); // Warm initial beep
+    setSightingCountdown(null);
   };
 
   const startListening = async () => {
@@ -1953,16 +1952,29 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
 
             <div className="flex flex-col gap-3 w-full">
               <div className="flex flex-col items-center">
-                <span className="text-[10px] text-slate-400 font-black tracking-widest uppercase mb-1">AUTO-CAPTURE COUNTDOWN</span>
-                <div className="text-4xl font-black text-white font-mono bg-slate-900 px-6 py-2 rounded-2xl border border-white/5 tracking-wider">
-                  {sightingCountdown}s
-                </div>
+                <span className="text-[10px] text-slate-400 font-black tracking-widest uppercase mb-1.5">AUTO-CAPTURE COUNTDOWN</span>
+                {sightingCountdown === null ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSightingCountdown(5);
+                      playClinometerTone(523.25, 0.1); // Warm initial beep
+                    }}
+                    className="w-full max-w-xs bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-2xl shadow-xl shadow-amber-500/20 transition-all font-mono"
+                  >
+                    ▶ Start 5s Countdown
+                  </button>
+                ) : (
+                  <div className="text-4xl font-black text-white font-mono bg-slate-900 px-6 py-2 rounded-2xl border border-white/5 tracking-wider">
+                    {sightingCountdown}s
+                  </div>
+                )}
               </div>
 
               <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5">
                 <p className="text-xs text-white font-medium leading-relaxed">
                   1. Sight along the top edge of your phone like a gun-sight to aim.<br/>
-                  2. Wait 3 seconds for the guide beeps to double-tone and auto-capture.<br/>
+                  2. Press <strong>Start 5s Countdown</strong> above, then wait for the guide beeps to double-tone and auto-capture.<br/>
                   <span className="text-amber-400 font-bold block mt-1.5 text-[13px]">★ Or simply TAP ANYWHERE on screen blindly to lock instantly!</span>
                 </p>
               </div>
