@@ -1339,8 +1339,19 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
   };
 
   // Calculations
+  const formatEyeHeight = (val: number) => {
+    if (unitSystem === 'Metric') {
+      return `${val.toFixed(2)} m`;
+    }
+    const ft = Math.floor(val);
+    const inches = Math.round((val - ft) * 12);
+    if (inches === 12) return `${ft + 1}' 0"`;
+    return `${ft}' ${inches}"`;
+  };
+
   const calculateDepth = (): { depthFeet: number; explanation: string; warning?: string } => {
     const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const eyeHeightInFeet = unitSystem === 'Metric' ? eyeHeight / 0.3048 : eyeHeight;
 
     if (activeTab === 'stimp') {
       if (stimpSubMode === 'slope') {
@@ -1364,13 +1375,13 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       }
     } else if (activeTab === 'eye') {
       if (eyeSubMode === 'bottom_up') {
-        const d = eyeHeight + (eyeDistance * Math.tan(toRad(eyeAngle)));
+        const d = eyeHeightInFeet + (eyeDistance * Math.tan(toRad(eyeAngle)));
         return {
           depthFeet: d,
-          explanation: `Standing inside looking up. Total depth = Eye Height (${eyeHeight}') + (Estimated Distance ${eyeDistance}' × tan(${eyeAngle}°)).`
+          explanation: `Standing inside looking up. Total depth = Eye Height (${formatEyeHeight(eyeHeight)}) + (Estimated Distance ${eyeDistance}' × tan(${eyeAngle}°)).`
         };
       } else {
-        const d = (eyeDistance * Math.tan(toRad(eyeAngle))) - eyeHeight;
+        const d = (eyeDistance * Math.tan(toRad(eyeAngle))) - eyeHeightInFeet;
         if (d < 0) {
           return {
             depthFeet: 0,
@@ -1380,7 +1391,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
         }
         return {
           depthFeet: d,
-          explanation: `Standing on top lip looking down. Depth = (Estimated Distance ${eyeDistance}' × tan(${eyeAngle}°)) - Eye Height (${eyeHeight}').`
+          explanation: `Standing on top lip looking down. Depth = (Estimated Distance ${eyeDistance}' × tan(${eyeAngle}°)) - Eye Height (${formatEyeHeight(eyeHeight)}).`
         };
       }
     } else {
@@ -1394,10 +1405,10 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       const num = Math.tan(toRad(stepAngle1)) * Math.tan(toRad(stepAngle2));
       const den = Math.tan(toRad(stepAngle1)) - Math.tan(toRad(stepAngle2));
       const h_lip = stepDistance * (num / den);
-      const totalH = eyeHeight + h_lip;
+      const totalH = eyeHeightInFeet + h_lip;
       return {
         depthFeet: totalH,
-        explanation: `Step-Back calculation. Lip height above eye level is ${h_lip.toFixed(1)}'. Total depth = Eye Height + Lip height.`
+        explanation: `Step-Back calculation. Lip height above eye level is ${h_lip.toFixed(1)}'. Total depth = Eye Height (${formatEyeHeight(eyeHeight)}) + Lip height.`
       };
     }
   };
@@ -1426,7 +1437,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
   const classification = getBunkerClassification(depthFeet);
 
   const adjustVal = (curr: number, set: (v: number) => void, step: number, min: number, max: number) => {
-    const next = Number((curr + step).toFixed(1));
+    const next = Number((curr + step).toFixed(2));
     if (next >= min && next <= max) set(next);
   };
 
@@ -1475,12 +1486,12 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
         <div>
           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Rater Eye Height</label>
           <div className="flex items-center gap-2">
-            <span className="text-white font-mono text-sm font-bold">{eyeHeight.toFixed(1)}' ft</span>
+            <span className="text-white font-mono text-sm font-bold">{formatEyeHeight(eyeHeight)}</span>
             <input 
               type="range" 
-              min="4.5" 
-              max="7.0" 
-              step="0.1" 
+              min={unitSystem === 'Imperial' ? "4.5" : "1.35"}
+              max={unitSystem === 'Imperial' ? "7.0" : "2.15"}
+              step={unitSystem === 'Imperial' ? "0.0833333" : "0.01"}
               value={eyeHeight} 
               onChange={(e) => setEyeHeight(parseFloat(e.target.value))}
               className="flex-1 accent-amber-500 h-1 bg-slate-800 rounded-lg appearance-none"
@@ -1490,8 +1501,30 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
         <div>
           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Unit Output</label>
           <div className="grid grid-cols-2 gap-1 bg-slate-950 p-0.5 rounded-lg border border-white/5">
-            <button onClick={() => setUnitSystem('Imperial')} className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Imperial' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}>Ft / In</button>
-            <button onClick={() => setUnitSystem('Metric')} className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Metric' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}>Metres</button>
+            <button 
+              onClick={() => {
+                if (unitSystem !== 'Imperial') {
+                  setUnitSystem('Imperial');
+                  const converted = eyeHeight / 0.3048;
+                  setEyeHeight(Math.min(7.0, Math.max(4.5, Math.round(converted * 12) / 12)));
+                }
+              }} 
+              className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Imperial' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+            >
+              Ft / In
+            </button>
+            <button 
+              onClick={() => {
+                if (unitSystem !== 'Metric') {
+                  setUnitSystem('Metric');
+                  const converted = eyeHeight * 0.3048;
+                  setEyeHeight(Math.min(2.15, Math.max(1.35, Math.round(converted * 100) / 100)));
+                }
+              }} 
+              className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Metric' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+            >
+              Metres
+            </button>
           </div>
         </div>
       </div>
