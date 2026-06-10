@@ -1530,7 +1530,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
           </div>
 
           <div className="flex flex-col gap-1 flex-1">
-            <span className="text-[10px] text-slate-400 leading-tight">Tilt phone to target sight-line. Match level horizontal with your target depth.</span>
+            <span className="text-xs text-white font-medium leading-tight">Tilt phone to target sight-line. Match level horizontal with your target depth.</span>
             {sensorsActive && (
               <div className="flex flex-wrap gap-2 mt-1">
                 {activeTab === 'stimp' && stimpSubMode === 'slope' && (
@@ -1580,7 +1580,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
 
             {stimpSubMode === 'slope' ? (
               <div className="flex flex-col gap-2">
-                <p className="text-[11px] text-slate-300 leading-normal mb-1">
+                <p className="text-xs sm:text-sm text-white font-medium leading-normal mb-2">
                   Place the 36-inch (3.0ft) Stimpmeter directly along the steepest face of the bunker wall. Enter the inclination angle from horizontal.
                 </p>
                 <div className="bg-slate-900/60 p-4 rounded-2xl flex flex-col items-center">
@@ -1602,7 +1602,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                <p className="text-[11px] text-slate-300 leading-normal text-center">
+                <p className="text-xs sm:text-sm text-white font-medium leading-normal text-center mb-1">
                   Stand the 3.0ft Stimpmeter vertically at the bottom. Stand back. Sight the top of the Stimpmeter (θ1) and the top of the bunker lip (θ2).
                 </p>
                 
@@ -1648,7 +1648,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
               </button>
             </div>
 
-            <p className="text-[11px] text-slate-300 leading-normal text-center">
+            <p className="text-xs sm:text-sm text-white font-medium leading-normal text-center mb-1">
               {eyeSubMode === 'bottom_up' 
                 ? "Stand in bottom of bunker. Estimate horizontal distance separation and sight the top of the lip." 
                 : "Stand at the top of the lip. Estimate horizontal separation to deepest sand point and sight downward."
@@ -1697,7 +1697,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
         {/* Method 3: Step-Back */}
         {activeTab === 'step' && (
           <div className="flex flex-col gap-4">
-            <p className="text-[11px] text-slate-300 leading-normal text-center">
+            <p className="text-xs sm:text-sm text-white font-medium leading-normal text-center mb-1">
               Stand inside looking up. Measure closer angle (θ1). Step back 1 standard pace (e.g. 3ft) and measure far angle (θ2). No distance guess required!
             </p>
 
@@ -1758,8 +1758,8 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/80 mb-2 border border-white/5">
                   <span className={`text-[10px] font-black uppercase ${classification.color}`}>{classification.title}</span>
                 </div>
-                <p className="text-[11px] text-slate-400 max-w-[280px] leading-relaxed mb-2">{classification.desc}</p>
-                <div className="text-[10px] text-slate-500 bg-slate-950/40 p-2 rounded-lg font-mono">
+                <p className="text-xs sm:text-sm text-white max-w-[280px] leading-relaxed mb-1">{classification.desc}</p>
+                <div className="text-xs text-white bg-slate-950/60 p-2 rounded-lg font-mono">
                   {explanation}
                 </div>
               </div>
@@ -1773,7 +1773,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       </div>
       
       {/* Informative citation about pot bunkers */}
-      <div className="mt-4 text-center opacity-60 text-[9px] text-slate-400 pb-2">
+      <div className="mt-4 text-center text-xs text-white/90 font-medium pb-2">
         A USGA standard Stimpmeter is exactly 3.0 feet long and provides an exceptional physical yardstick.
       </div>
     </div>
