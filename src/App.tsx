@@ -1259,6 +1259,30 @@ const StimpCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
+const playClinometerTone = (frequency: number, duration: number) => {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.frequency.value = frequency;
+    osc.type = 'sine';
+    
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  } catch (e) {
+    // Fail silently
+  }
+};
+
 const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'stimp' | 'eye' | 'step'>('stimp');
   
@@ -1270,6 +1294,12 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
   const [liveAngle, setLiveAngle] = useState<number>(0);
   const [sensorsActive, setSensorsActive] = useState<boolean>(false);
   const [sensorFeedback, setSensorFeedback] = useState<string | null>(null);
+
+  // Human Ergonomic Alignment & Capture states
+  const [sightingTarget, setSightingTarget] = useState<'stimpSlopeAngle' | 'stimpAngleRef' | 'stimpAngleLip' | 'eyeAngle' | 'stepAngle1' | 'stepAngle2' | null>(null);
+  const [sightingCountdown, setSightingCountdown] = useState<number | null>(null);
+  const [recentAngles, setRecentAngles] = useState<number[]>([]);
+  const [isStable, setIsStable] = useState<boolean>(false);
 
   // Method 1: Stimpmeter
   const [stimpSubMode, setStimpSubMode] = useState<'slope' | 'distance'>('slope');
@@ -1287,7 +1317,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
   const [stepAngle1, setStepAngle1] = useState<number>(45); // close elevation angle
   const [stepAngle2, setStepAngle2] = useState<number>(25); // stepped-back elevation angle
 
-  // Handle device orientation for live tilt reading
+  // Handle device orientation for live tilt reading with stabilization tracking
   useEffect(() => {
     if (!sensorsActive) return;
 
@@ -1295,6 +1325,18 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       if (e.beta !== null) {
         const pitchVal = Math.min(90, Math.max(0, Math.round(Math.abs(e.beta))));
         setLiveAngle(pitchVal);
+        
+        if (sightingTarget) {
+          setRecentAngles(prev => {
+            const updated = [...prev, pitchVal].slice(-10);
+            if (updated.length >= 6) {
+              const max = Math.max(...updated);
+              const min = Math.min(...updated);
+              setIsStable(max - min <= 1);
+            }
+            return updated;
+          });
+        }
       }
     };
 
@@ -1319,7 +1361,53 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
     return () => {
       window.removeEventListener('deviceorientation', handleOrientation);
     };
-  }, [sensorsActive]);
+  }, [sensorsActive, sightingTarget]);
+
+  // Audio-Guided Sighting Countdown manager
+  useEffect(() => {
+    if (sightingTarget === null || sightingCountdown === null) return;
+
+    if (sightingCountdown > 0) {
+      const timer = setTimeout(() => {
+        const nextSec = sightingCountdown - 1;
+        setSightingCountdown(nextSec);
+        if (nextSec > 0) {
+          playClinometerTone(523.25, 0.1); // Beep sound
+        } else {
+          // Double beep success at 0 sec
+          playClinometerTone(880, 0.15);
+          setTimeout(() => playClinometerTone(1046.5, 0.25), 180);
+          
+          saveAngleValue(sightingTarget, liveAngle);
+          setSightingTarget(null);
+          setSightingCountdown(null);
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [sightingCountdown, sightingTarget, liveAngle]);
+
+  const saveAngleValue = (target: string, value: number) => {
+    if (target === 'stimpSlopeAngle') setStimpSlopeAngle(value);
+    else if (target === 'stimpAngleRef') setStimpAngleRef(value);
+    else if (target === 'stimpAngleLip') setStimpAngleLip(value);
+    else if (target === 'eyeAngle') setEyeAngle(value);
+    else if (target === 'stepAngle1') setStepAngle1(value);
+    else if (target === 'stepAngle2') setStepAngle2(value);
+  };
+
+  const launchSighter = async (target: 'stimpSlopeAngle' | 'stimpAngleRef' | 'stimpAngleLip' | 'eyeAngle' | 'stepAngle1' | 'stepAngle2') => {
+    setSightingTarget(target);
+    setRecentAngles([]);
+    setIsStable(false);
+    
+    if (!sensorsActive) {
+      await startListening();
+    }
+    
+    setSightingCountdown(3);
+    playClinometerTone(523.25, 0.1); // Warm initial beep
+  };
 
   const startListening = async () => {
     if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
@@ -1562,30 +1650,40 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
             <span className="relative z-10 font-mono text-xs font-black text-white bg-slate-950 px-1 rounded">{liveAngle}°</span>
           </div>
 
-          <div className="flex flex-col gap-1 flex-1">
-            <span className="text-xs text-white font-medium leading-tight">Tilt phone to target sight-line. Match level horizontal with your target depth.</span>
-            {sensorsActive && (
-              <div className="flex flex-wrap gap-2 mt-1">
-                {activeTab === 'stimp' && stimpSubMode === 'slope' && (
-                  <button onClick={() => setStimpSlopeAngle(liveAngle)} className="bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-bold px-2 py-1 rounded">Set Slope Angle</button>
-                )}
-                {activeTab === 'stimp' && stimpSubMode === 'distance' && (
-                  <div className="flex gap-1">
-                    <button onClick={() => setStimpAngleRef(liveAngle)} className="bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-bold px-2 py-1 rounded">Set Ref Angle</button>
-                    <button onClick={() => setStimpAngleLip(liveAngle)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-bold px-2 py-1 rounded">Set Lip Angle</button>
-                  </div>
-                )}
-                {activeTab === 'eye' && (
-                  <button onClick={() => setEyeAngle(liveAngle)} className="bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-bold px-2 py-1 rounded font-black font-mono">Set Sighting</button>
-                )}
-                {activeTab === 'step' && (
-                  <div className="flex gap-1">
-                    <button onClick={() => setStepAngle1(liveAngle)} className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold px-2 py-1 rounded font-black font-mono">Set Scope 1</button>
-                    <button onClick={() => setStepAngle2(liveAngle)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold px-2 py-1 rounded font-black font-mono">Set Scope 2</button>
-                  </div>
-                )}
-              </div>
-            )}
+          <div className="flex flex-col gap-1.5 flex-1">
+            <span className="text-xs text-white/95 font-medium leading-tight">Tilt phone to target sight-line. Line up the top edge of phone with target.</span>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {activeTab === 'stimp' && stimpSubMode === 'slope' && (
+                <button onClick={() => launchSighter('stimpSlopeAngle')} className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-[11px] font-black uppercase px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-lg shadow-amber-900/30">
+                  <span>🔊 Guided Sighting</span>
+                </button>
+              )}
+              {activeTab === 'stimp' && stimpSubMode === 'distance' && (
+                <div className="flex gap-2">
+                  <button onClick={() => launchSighter('stimpAngleRef')} className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-[10px] font-black uppercase px-2.5 py-2 rounded-xl shadow-lg shadow-amber-900/30">
+                    <span>θ1 Sighting</span>
+                  </button>
+                  <button onClick={() => launchSighter('stimpAngleLip')} className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[10px] font-black uppercase px-2.5 py-2 rounded-xl shadow-lg shadow-emerald-900/30">
+                    <span>θ2 Sighting</span>
+                  </button>
+                </div>
+              )}
+              {activeTab === 'eye' && (
+                <button onClick={() => launchSighter('eyeAngle')} className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-[11px] font-black uppercase px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-lg shadow-amber-900/30">
+                  <span>🔊 Guided Sighting</span>
+                </button>
+              )}
+              {activeTab === 'step' && (
+                <div className="flex gap-2">
+                  <button onClick={() => launchSighter('stepAngle1')} className="bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-[10px] font-black uppercase px-2.5 py-2 rounded-xl shadow-lg shadow-amber-900/30">
+                    <span>θ1 Sighting</span>
+                  </button>
+                  <button onClick={() => launchSighter('stepAngle2')} className="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-[10px] font-black uppercase px-2.5 py-2 rounded-xl shadow-lg shadow-indigo-900/30">
+                    <span>θ2 Sighting</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1684,7 +1782,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
             <p className="text-xs sm:text-sm text-white font-medium leading-normal text-center mb-1">
               {eyeSubMode === 'bottom_up' 
                 ? "Stand in bottom of bunker. Estimate horizontal distance separation and sight the top of the lip." 
-                : "Stand at the top of the lip. Estimate horizontal separation to deepest sand point and sight downward."
+                : "Stand at top lip. Estimate horizontal separation. Sight the deepest sand point by aligning the top edge of your phone like a gun-sight pointing at it, then tap Set Sighting."
               }
             </p>
 
@@ -1809,6 +1907,80 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       <div className="mt-4 text-center text-xs text-white/90 font-medium pb-2">
         A USGA standard Stimpmeter is exactly 3.0 feet long and provides an exceptional physical yardstick.
       </div>
+
+      {/* Ergonomic Tactile Guided Sighter Overlay Modal */}
+      {sightingTarget && (
+        <div 
+          onClick={() => {
+            // Squeeze/Tap anywhere on screen locks the current angle instantly
+            playClinometerTone(987.77, 0.35); // Success high chime B5
+            saveAngleValue(sightingTarget, liveAngle);
+            setSightingTarget(null);
+            setSightingCountdown(null);
+          }}
+          className="fixed inset-0 z-[3000] bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center select-none"
+        >
+          <div className="max-w-md flex flex-col items-center gap-6">
+            <div className="w-20 h-20 rounded-full border-4 border-amber-500 flex items-center justify-center animate-pulse bg-amber-500/10 mb-2">
+              <Compass size={40} className="text-amber-400 rotate-12" />
+            </div>
+            
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-black tracking-widest text-amber-500 uppercase">ACTIVE COGNITIVE SIGHTING</span>
+              <h2 className="text-2xl font-black text-white">Line Up & Aim Phone</h2>
+              <p className="text-xs text-slate-400 font-bold uppercase mt-1">
+                Targeting: {
+                  sightingTarget === 'stimpSlopeAngle' ? "Slope Angle" :
+                  sightingTarget === 'stimpAngleRef' ? "Stimp Top Angle (θ1)" :
+                  sightingTarget === 'stimpAngleLip' ? "Bunker Lip Angle (θ2)" :
+                  sightingTarget === 'eyeAngle' ? "Tilt Angle (θ)" :
+                  sightingTarget === 'stepAngle1' ? "Close Sighting (θ1)" :
+                  "Stepped Sighting (θ2)"
+                }
+              </p>
+            </div>
+
+            <div className="bg-slate-900 border border-white/5 p-6 rounded-3xl w-full flex flex-col items-center gap-1.5 shadow-2xl">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Angle Reading</span>
+              <span className="text-6xl font-black text-white font-mono">{liveAngle}°</span>
+              
+              {isStable && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[10px] text-emerald-400 font-extrabold uppercase animate-pulse mt-1">
+                  ✓ SIGHT LINE STABLIZED
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 w-full">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] text-slate-400 font-black tracking-widest uppercase mb-1">AUTO-CAPTURE COUNTDOWN</span>
+                <div className="text-4xl font-black text-white font-mono bg-slate-900 px-6 py-2 rounded-2xl border border-white/5 tracking-wider">
+                  {sightingCountdown}s
+                </div>
+              </div>
+
+              <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+                <p className="text-xs text-white font-medium leading-relaxed">
+                  1. Sight along the top edge of your phone like a gun-sight to aim.<br/>
+                  2. Wait 3 seconds for the guide beeps to double-tone and auto-capture.<br/>
+                  <span className="text-amber-400 font-bold block mt-1.5 text-[13px]">★ Or simply TAP ANYWHERE on screen blindly to lock instantly!</span>
+                </p>
+              </div>
+            </div>
+
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setSightingTarget(null);
+                setSightingCountdown(null);
+              }}
+              className="mt-4 font-bold uppercase tracking-wider text-[11px] border border-white/20 hover:border-white/40 text-slate-400 py-2.5 px-6 rounded-full active:scale-95 transition-all"
+            >
+              Cancel Sighting
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
