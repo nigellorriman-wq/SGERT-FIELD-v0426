@@ -1552,6 +1552,22 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
 
   const { depthFeet, explanation, warning } = calculateDepth();
 
+  const getMenAdjustment = (depth: number): number => {
+    if (depth > 15) return 4;
+    if (depth > 10) return 3;
+    if (depth > 6) return 2;
+    if (depth > 3) return 1;
+    return 0;
+  };
+
+  const getWomenAdjustment = (depth: number): number => {
+    if (depth > 12) return 4;
+    if (depth > 8) return 3;
+    if (depth > 5) return 2;
+    if (depth > 2) return 1;
+    return 0;
+  };
+
   const formatDepth = (val: number) => {
     if (unitSystem === 'Metric') {
       const metres = val * 0.3048;
@@ -1616,7 +1632,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
             <span className="text-white font-mono text-sm font-bold">{formatEyeHeight(eyeHeight)}</span>
             <input 
               type="range" 
-              min={unitSystem === 'Imperial' ? "4.5" : "1.35"}
+              min={unitSystem === 'Imperial' ? "3.0" : "0.90"}
               max={unitSystem === 'Imperial' ? "7.0" : "2.15"}
               step={unitSystem === 'Imperial' ? "0.0833333" : "0.01"}
               value={eyeHeight} 
@@ -1633,7 +1649,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 if (unitSystem !== 'Imperial') {
                   setUnitSystem('Imperial');
                   const converted = eyeHeight / 0.3048;
-                  setEyeHeight(Math.min(7.0, Math.max(4.5, Math.round(converted * 12) / 12)));
+                  setEyeHeight(Math.min(7.0, Math.max(3.0, Math.round(converted * 12) / 12)));
                   const convertedDist = eyeDistance / 0.3048;
                   setEyeDistance(Math.min(25.0, Math.max(1.0, Math.round(convertedDist * 2) / 2)));
                 }
@@ -1647,7 +1663,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 if (unitSystem !== 'Metric') {
                   setUnitSystem('Metric');
                   const converted = eyeHeight * 0.3048;
-                  setEyeHeight(Math.min(2.15, Math.max(1.35, Math.round(converted * 100) / 100)));
+                  setEyeHeight(Math.min(2.15, Math.max(0.90, Math.round(converted * 100) / 100)));
                   const convertedDist = eyeDistance * 0.3048;
                   setEyeDistance(Math.min(8.0, Math.max(0.3, Math.round(convertedDist * 10) / 10)));
                 }
@@ -1937,7 +1953,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
         {/* Calculated Results Area */}
         <div className="mt-auto pt-4 border-t border-white/5 flex flex-col gap-3">
           <div className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            <span>Resulting Bunker Depth</span>
+            <span>Resulting Bunker Depth & Manual Adjustments</span>
           </div>
 
           <div className="bg-[#0b1329] border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
@@ -1948,6 +1964,28 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                   {formatDepth(depthFeet)}
                 </span>
                 
+                {/* Rating manual adjustment values */}
+                <div className="grid grid-cols-2 gap-2 w-full max-w-[340px] mb-3">
+                  <div className="bg-slate-950/60 border border-white/5 rounded-xl p-2 flex flex-col items-center justify-center">
+                    <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Men's Manual Adj</span>
+                    <span className="text-xl font-black font-mono text-amber-500">
+                      {getMenAdjustment(depthFeet) > 0 ? `+${getMenAdjustment(depthFeet)}` : '0'}
+                    </span>
+                    <span className="text-[7px] text-slate-500 uppercase mt-0.5 tracking-tight font-sans">
+                      &gt;3':+1 | &gt;6':+2 | &gt;10':+3 | &gt;15':+4
+                    </span>
+                  </div>
+                  <div className="bg-slate-950/60 border border-white/5 rounded-xl p-2 flex flex-col items-center justify-center">
+                    <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Women's Manual Adj</span>
+                    <span className="text-xl font-black font-mono text-amber-500">
+                      {getWomenAdjustment(depthFeet) > 0 ? `+${getWomenAdjustment(depthFeet)}` : '0'}
+                    </span>
+                    <span className="text-[7px] text-slate-500 uppercase mt-0.5 tracking-tight font-sans">
+                      &gt;2':+1 | &gt;5':+2 | &gt;8':+3 | &gt;12':+4
+                    </span>
+                  </div>
+                </div>
+
                 <div className="text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl font-mono max-w-[340px] leading-relaxed border border-white/5 w-full">
                   {explanation}
                 </div>
@@ -1959,11 +1997,6 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
             )}
           </div>
         </div>
-      </div>
-      
-      {/* Informative citation about pot bunkers */}
-      <div className="mt-4 text-center text-xs text-white/90 font-medium pb-2">
-        A USGA standard Stimpmeter is exactly 3.0 feet long and provides an exceptional physical yardstick.
       </div>
 
       {/* Ergonomic Tactile Guided Sighter Overlay Modal */}
