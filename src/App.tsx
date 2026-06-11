@@ -1523,7 +1523,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
           return {
             depthFeet: 0,
             explanation: `Standing on lip looking down. Depth is within rater's eye-height level.`,
-            warning: "Depression angle is too shallow to calculate depth above your eye level."
+            warning: "Angle too shallow to calculate a depth"
           };
         }
         return {
@@ -1966,27 +1966,21 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 
                 {/* Rating manual adjustment values */}
                 <div className="grid grid-cols-2 gap-2 w-full max-w-[340px] mb-3">
-                  <div className="bg-slate-950/60 border border-white/5 rounded-xl p-2 flex flex-col items-center justify-center">
-                    <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Men's Manual Adj</span>
-                    <span className="text-xl font-black font-mono text-amber-500">
+                  <div className="bg-slate-950/60 border border-white/5 rounded-xl p-3 flex flex-col items-center justify-center">
+                    <span className="text-[9px] font-black uppercase text-white tracking-wider mb-1">Men Depth Adj</span>
+                    <span className="text-2xl font-black font-mono text-amber-500">
                       {getMenAdjustment(depthFeet) > 0 ? `+${getMenAdjustment(depthFeet)}` : '0'}
                     </span>
-                    <span className="text-[7px] text-slate-500 uppercase mt-0.5 tracking-tight font-sans">
-                      &gt;3':+1 | &gt;6':+2 | &gt;10':+3 | &gt;15':+4
-                    </span>
                   </div>
-                  <div className="bg-slate-950/60 border border-white/5 rounded-xl p-2 flex flex-col items-center justify-center">
-                    <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Women's Manual Adj</span>
-                    <span className="text-xl font-black font-mono text-amber-500">
+                  <div className="bg-slate-950/60 border border-white/5 rounded-xl p-3 flex flex-col items-center justify-center">
+                    <span className="text-[9px] font-black uppercase text-white tracking-wider mb-1">Women Depth Adj</span>
+                    <span className="text-2xl font-black font-mono text-amber-500">
                       {getWomenAdjustment(depthFeet) > 0 ? `+${getWomenAdjustment(depthFeet)}` : '0'}
-                    </span>
-                    <span className="text-[7px] text-slate-500 uppercase mt-0.5 tracking-tight font-sans">
-                      &gt;2':+1 | &gt;5':+2 | &gt;8':+3 | &gt;12':+4
                     </span>
                   </div>
                 </div>
 
-                <div className="text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl font-mono max-w-[340px] leading-relaxed border border-white/5 w-full">
+                <div className="text-xs text-white font-medium bg-slate-950/60 p-3 rounded-xl font-mono max-w-[340px] leading-relaxed border border-white/5 w-full">
                   {explanation}
                 </div>
               </div>
@@ -2103,7 +2097,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                   <p>
                     <strong className="text-amber-400 uppercase tracking-wider text-[9px] block">📋 Easy Steps:</strong>
                     1. Sight along the top edge to target.<br/>
-                    2. Tap <strong>Start Countdown</strong>, then hold perfectly still until the double-beep.
+                    2. Tap <strong>Start 5s Countdown</strong>, then hold perfectly still until the double-beep.
                   </p>
                 </div>
               </div>
