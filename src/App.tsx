@@ -1367,7 +1367,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
 
     const handleOrientation = (e: DeviceOrientationEvent) => {
       if (e.beta !== null) {
-        const pitchVal = Math.min(90, Math.max(0, Math.round(Math.abs(e.beta))));
+        const pitchVal = Math.min(180, Math.max(0, Math.round(Math.abs(e.beta))));
         setLiveAngle(pitchVal);
         
         if (sightingTarget) {
@@ -1436,7 +1436,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       setStimpSlopeAngle(value);
     } else {
       // Sighting angles are computed relative to the vertical 90-degree level plane
-      const physicalAngle = Math.max(0, Math.min(89, 90 - value));
+      const physicalAngle = Math.max(0, Math.min(89, Math.abs(90 - value)));
       if (target === 'stimpAngleRef') setStimpAngleRef(physicalAngle);
       else if (target === 'stimpAngleLip') setStimpAngleLip(physicalAngle);
       else if (target === 'eyeAngle') setEyeAngle(physicalAngle);
@@ -1562,16 +1562,6 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
     if (inches === 12) return `${ft + 1}' 0"`;
     return `${ft}' ${inches}"`;
   };
-
-  const getBunkerClassification = (val: number) => {
-    if (val <= 0) return { title: "Flat Sand", color: "text-slate-400", desc: "No significant depth." };
-    if (val < 2.0) return { title: "Shallow / Easy", color: "text-emerald-400", desc: "Easily walked out. Classic lob shot, low penalty risk." };
-    if (val < 4.0) return { title: "Standard Pot", color: "text-amber-400", desc: "Moderate challenge. Requires vertical lofted wedge. Sod/grass lip present." };
-    if (val < 6.0) return { title: "Severe Deep Face", color: "text-orange-400", desc: "High penalty hazard. Extremely vertical revetted face. Bogey player risk extreme." };
-    return { title: "Abyssal Scottish Pit", color: "text-red-500", desc: "Legendary hazard depth. Escape can require playing backward or high-risk pop shots." };
-  };
-
-  const classification = getBunkerClassification(depthFeet);
 
   const adjustVal = (curr: number, set: (v: number) => void, step: number, min: number, max: number) => {
     const next = Number((curr + step).toFixed(2));
@@ -1946,24 +1936,19 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
 
         {/* Calculated Results Area */}
         <div className="mt-auto pt-4 border-t border-white/5 flex flex-col gap-3">
-          <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
             <span>Resulting Bunker Depth</span>
-            <span>Est. playability</span>
           </div>
 
           <div className="bg-[#0b1329] border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
             {depthFeet > 0 ? (
-              <div className="flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+              <div className="flex flex-col items-center text-center animate-in zoom-in-95 duration-200 w-full">
                 <span className="text-[10px] uppercase font-black text-slate-300 mb-1 tracking-wider">Vertical Depth</span>
                 <span className="text-5xl font-black text-amber-500 tracking-tight font-mono mb-2">
                   {formatDepth(depthFeet)}
                 </span>
                 
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/80 mb-2 border border-white/5">
-                  <span className={`text-[10px] font-black uppercase ${classification.color}`}>{classification.title}</span>
-                </div>
-                <p className="text-xs sm:text-sm text-white max-w-[280px] leading-relaxed mb-1">{classification.desc}</p>
-                <div className="text-xs text-white bg-slate-950/60 p-2 rounded-lg font-mono">
+                <div className="text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl font-mono max-w-[340px] leading-relaxed border border-white/5 w-full">
                   {explanation}
                 </div>
               </div>
@@ -1991,17 +1976,17 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
             setSightingTarget(null);
             setSightingCountdown(null);
           }}
-          className="fixed inset-0 z-[3000] bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200"
+          className="fixed inset-0 z-[3000] bg-slate-950/95 flex flex-col items-center justify-center p-4 text-center select-none animate-in fade-in duration-200 overflow-y-auto"
         >
-          <div className="max-w-md w-full flex flex-col items-center gap-5">
-            <div className="w-16 h-16 rounded-full border-4 border-amber-500 flex items-center justify-center animate-pulse bg-amber-500/10">
-              <Compass size={32} className="text-amber-400 rotate-12" />
+          <div className="max-w-md w-full flex flex-col items-center gap-3.5 py-2">
+            <div className="flex items-center gap-2 justify-center">
+              <Compass size={24} className="text-amber-400 rotate-12 animate-pulse" />
+              <h2 className="text-xl font-black text-white">Line Up & Aim Phone</h2>
             </div>
             
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-black tracking-widest text-amber-500 uppercase">ACTIVE COGNITIVE SIGHTING</span>
-              <h2 className="text-2xl font-black text-white">Line Up & Aim Phone</h2>
-              <p className="text-xs text-slate-400 font-bold uppercase mt-0.5">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[9px] font-black tracking-widest text-amber-500 uppercase">ACTIVE COGNITIVE SIGHTING</span>
+              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
                 Targeting: {
                   sightingTarget === 'stimpSlopeAngle' ? "Slope Angle" :
                   sightingTarget === 'stimpAngleRef' ? "Stimp Top Angle (θ1)" :
@@ -2015,20 +2000,20 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
 
             {/* Landscape Rotation Alert */}
             {isLandscape && (
-              <div className="bg-rose-950/70 border-2 border-rose-500 p-3.5 rounded-2xl w-full flex flex-col gap-1 animate-bounce text-left shadow-lg shadow-rose-950/50">
-                <span className="text-rose-400 font-black text-xs uppercase tracking-wider block">⚠️ ROTATION WARNING</span>
-                <span className="text-white text-[11px] font-bold leading-normal">
-                  Your phone is currently sideways (landscape). Please turn it upright to <strong>Portrait Mode</strong>. The clinometer measures pitch angles assuming you are holding the phone vertically and sighting over the top edge.
+              <div className="bg-rose-950/70 border border-rose-500/50 p-3 rounded-2xl w-full flex flex-col gap-0.5 text-left shadow-lg">
+                <span className="text-rose-400 font-black text-[10px] uppercase tracking-wider block">⚠️ ROTATION WARNING</span>
+                <span className="text-white text-[10px] font-medium leading-normal">
+                  Your phone is currently sideways (landscape). Please turn it upright to <strong>Portrait Mode</strong>.
                 </span>
               </div>
             )}
 
-            <div className="bg-slate-900 border border-white/5 p-6 rounded-3xl w-full flex flex-col items-center gap-1.5 shadow-2xl">
-              <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
+            <div className="bg-slate-900 border border-white/5 p-4 rounded-2xl w-full flex flex-col items-center gap-1 shadow-2xl">
+              <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest">
                 {sightingTarget === 'stimpSlopeAngle' ? "Live Slope Angle" : "Live Sighting Angle (θ)"}
               </span>
-              <span className="text-6xl font-black text-white font-mono">
-                {sightingTarget === 'stimpSlopeAngle' ? liveAngle : Math.max(0, 90 - liveAngle)}°
+              <span className="text-5xl font-black text-white font-mono leading-none py-1">
+                {sightingTarget === 'stimpSlopeAngle' ? liveAngle : Math.abs(90 - liveAngle)}°
               </span>
               {sightingTarget !== 'stimpSlopeAngle' && (
                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">
@@ -2036,16 +2021,23 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 </span>
               )}
               
-              {!isLandscape && isStable && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[10px] text-emerald-400 font-extrabold uppercase animate-pulse mt-1">
-                  ✓ SIGHT LINE STABLIZED
-                </span>
-              )}
+              {/* Reserved height of 16px to prevent layout movement */}
+              <div className="h-4 flex items-center justify-center mt-1">
+                {!isLandscape && isStable ? (
+                  <span className="inline-flex items-center gap-1 text-[9px] text-emerald-400 font-extrabold uppercase tracking-wider animate-pulse">
+                    ✓ SIGHT LINE STRENGTH STABILIZED
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                    {!isLandscape ? "Hold phone steady to stabilize" : ""}
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-col gap-3 w-full">
+            <div className="flex flex-col gap-2 w-full">
               <div className="flex flex-col items-center">
-                <span className="text-[10px] text-slate-400 font-black tracking-widest uppercase mb-1.5">AUTO-CAPTURE COUNTDOWN</span>
+                <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase mb-1">AUTO-CAPTURE COUNTDOWN</span>
                 {sightingCountdown === null ? (
                   <button
                     onClick={(e) => {
@@ -2054,7 +2046,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                       playClinometerTone(523.25, 0.1); // Warm initial beep
                     }}
                     disabled={isLandscape}
-                    className={`w-full max-w-xs font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-2xl transition-all font-mono ${
+                    className={`w-full max-w-xs font-black text-xs uppercase tracking-wider py-2.5 px-6 rounded-xl transition-all font-mono ${
                       isLandscape 
                         ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed opacity-50' 
                         : 'bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 shadow-xl shadow-amber-500/20'
@@ -2063,23 +2055,22 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                     {isLandscape ? "Rotate upright to Start" : "▶ Start 5s Countdown"}
                   </button>
                 ) : (
-                  <div className="text-4xl font-black text-white font-mono bg-slate-900 px-6 py-2 rounded-2xl border border-white/5 tracking-wider">
+                  <div className="text-3xl font-black text-white font-mono bg-slate-900 px-6 py-1.5 rounded-xl border border-white/5 tracking-wider">
                     {sightingCountdown}s
                   </div>
                 )}
               </div>
 
-              <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5 text-left text-xs text-white font-medium leading-relaxed">
-                <div className="flex flex-col gap-2">
+              <div className="bg-slate-900/60 p-3 rounded-xl border border-white/5 text-left text-[11px] text-slate-300 font-medium leading-normal">
+                <div className="flex flex-col gap-1.5">
                   <p>
-                    <strong className="text-amber-400 uppercase tracking-wider text-[10px] block mb-1">🔫 Sighting Technique:</strong>
-                    Always hold phone upright vertically in <strong>Portrait Orientation</strong>. Line up and aim by sighting along the flat <strong>TOP EDGE</strong> of the phone like a gun-sight pointing at the target sand-point or lip. Do NOT use the side of the phone.
+                    <strong className="text-amber-400 uppercase tracking-wider text-[9px] block">🔫 Sighting Technique:</strong>
+                    Hold phone upright in <strong>Portrait Orientation</strong>. Line up and aim by sighting along the flat <strong>TOP EDGE</strong> of the phone like a gun-sight. Do NOT use the side of the phone.
                   </p>
                   <p>
-                    <strong className="text-amber-400 uppercase tracking-wider text-[10px] block mb-1">📋 Sighting Steps:</strong>
+                    <strong className="text-amber-400 uppercase tracking-wider text-[9px] block">📋 Easy Steps:</strong>
                     1. Sight along the top edge to target.<br/>
-                    2. Press <strong>Start 5s Countdown</strong> above, then hold perfectly still until the guide double-beep sounds.<br/>
-                    <span className="text-amber-300 font-bold block mt-1.5 text-[12px]">★ Or feel free to TAP ANYONE on screen blindly at any time to freeze & lock the reading instantly!</span>
+                    2. Tap <strong>Start Countdown</strong>, then hold perfectly still until the double-beep.
                   </p>
                 </div>
               </div>
@@ -2091,7 +2082,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 setSightingTarget(null);
                 setSightingCountdown(null);
               }}
-              className="mt-4 font-bold uppercase tracking-wider text-[11px] border border-white/20 hover:border-white/40 text-slate-400 py-2.5 px-6 rounded-full active:scale-95 transition-all"
+              className="mt-1 font-bold uppercase tracking-wider text-[10px] border border-white/20 hover:border-white/40 text-slate-400 py-1.5 px-5 rounded-full active:scale-95 transition-all"
             >
               Cancel Sighting
             </button>
@@ -2588,7 +2579,7 @@ const App: React.FC = () => {
       const landscape = window.innerWidth > window.innerHeight;
       const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
       const isSmallHeight = window.innerHeight < 550;
-      setIsMobileLandscape(landscape && (isTouch || isSmallHeight || window.innerWidth < 850));
+      setIsMobileLandscape(landscape && (isTouch || isSmallHeight || window.innerWidth < 1024));
     };
     handleResize();
     window.addEventListener('resize', handleResize);
@@ -3527,6 +3518,9 @@ const App: React.FC = () => {
               </p>
               <p className="text-[11px] text-amber-400 font-bold leading-normal">
                 Please rotate your mobile device or resize your screen back to Portrait Orientation to continue.
+              </p>
+              <p className="text-[10px] text-slate-400 leading-normal mt-1 border-t border-white/5 pt-2.5">
+                💡 <strong>Field Tip:</strong> Tipping your phone too far downwards can sometimes trigger system auto-rotation. We highly recommend locking your phone to <strong>Portrait Orientation</strong> in your device settings.
               </p>
             </div>
           </div>
