@@ -1283,6 +1283,63 @@ const playClinometerTone = (frequency: number, duration: number) => {
   }
 };
 
+const speakText = (text: string) => {
+  try {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+  } catch (error) {
+    console.error("Speech synthesis failed", error);
+  }
+};
+
+const playCameraShutterSound = () => {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    
+    const bufferSize = ctx.sampleRate * 0.25;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    
+    const noiseNode = ctx.createBufferSource();
+    noiseNode.buffer = buffer;
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1200;
+    filter.Q.value = 3;
+    
+    const gain = ctx.createGain();
+    
+    noiseNode.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    
+    const now = ctx.currentTime;
+    
+    gain.gain.setValueAtTime(0.0, now);
+    gain.gain.linearRampToValueAtTime(0.15, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+    
+    gain.gain.linearRampToValueAtTime(0.15, now + 0.10);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+    
+    noiseNode.start(now);
+    noiseNode.stop(now + 0.25);
+  } catch (e) {
+    // Fail silently
+  }
+};
+
 const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'stimp' | 'eye' | 'step'>('stimp');
   
@@ -1298,6 +1355,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
   // Human Ergonomic Alignment & Capture states
   const [sightingTarget, setSightingTarget] = useState<'stimpSlopeAngle' | 'stimpAngleRef' | 'stimpAngleLip' | 'eyeAngle' | 'stepAngle1' | 'stepAngle2' | null>(null);
   const [sightingCountdown, setSightingCountdown] = useState<number | null>(null);
+  const [isWaitingForStable, setIsWaitingForStable] = useState<boolean>(false);
   const [recentAngles, setRecentAngles] = useState<number[]>([]);
   const [isStable, setIsStable] = useState<boolean>(false);
 
@@ -1407,6 +1465,15 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
     };
   }, [sensorsActive, sightingTarget]);
 
+  // Automated transition from waiting-for-stable state to countdown state
+  useEffect(() => {
+    if (isWaitingForStable && isStable) {
+      setIsWaitingForStable(false);
+      setSightingCountdown(5);
+      playClinometerTone(523.25, 0.1); // Warm initial beep
+    }
+  }, [isWaitingForStable, isStable]);
+
   // Audio-Guided Sighting Countdown manager
   useEffect(() => {
     if (sightingTarget === null || sightingCountdown === null) return;
@@ -1418,9 +1485,8 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
         if (nextSec > 0) {
           playClinometerTone(523.25, 0.1); // Beep sound
         } else {
-          // Double beep success at 0 sec
-          playClinometerTone(880, 0.15);
-          setTimeout(() => playClinometerTone(1046.5, 0.25), 180);
+          // Camera shutter sound at final moment
+          playCameraShutterSound();
           
           saveAngleValue(sightingTarget, liveAngle);
           setSightingTarget(null);
@@ -1449,6 +1515,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
     setSightingTarget(target);
     setRecentAngles([]);
     setIsStable(false);
+    setIsWaitingForStable(false);
     
     if (!sensorsActive) {
       await startListening();
@@ -2002,6 +2069,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
             saveAngleValue(sightingTarget, liveAngle);
             setSightingTarget(null);
             setSightingCountdown(null);
+            setIsWaitingForStable(false);
           }}
           className="fixed inset-0 z-[3000] bg-slate-950/95 flex flex-col items-center justify-center p-4 text-center select-none animate-in fade-in duration-200 overflow-y-auto"
         >
@@ -2066,21 +2134,27 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
               <div className="flex flex-col items-center">
                 <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase mb-1">AUTO-CAPTURE COUNTDOWN</span>
                 {sightingCountdown === null ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSightingCountdown(5);
-                      playClinometerTone(523.25, 0.1); // Warm initial beep
-                    }}
-                    disabled={isLandscape}
-                    className={`w-full max-w-xs font-black text-xs uppercase tracking-wider py-2.5 px-6 rounded-xl transition-all font-mono ${
-                      isLandscape 
-                        ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed opacity-50' 
-                        : 'bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 shadow-xl shadow-amber-500/20'
-                    }`}
-                  >
-                    {isLandscape ? "Rotate upright to Start" : "▶ Start 5s Countdown"}
-                  </button>
+                  isWaitingForStable ? (
+                    <div className="w-full max-w-xs font-black text-xs uppercase tracking-wider py-2.5 px-6 rounded-xl transition-all font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30 text-center animate-pulse">
+                      ⌛ Waiting for stable hold...
+                    </div>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        speakText("Hold the device steady");
+                        setIsWaitingForStable(true);
+                      }}
+                      disabled={isLandscape}
+                      className={`w-full max-w-xs font-black text-xs uppercase tracking-wider py-2.5 px-6 rounded-xl transition-all font-mono ${
+                        isLandscape 
+                          ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed opacity-50' 
+                          : 'bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 shadow-xl shadow-amber-500/20'
+                      }`}
+                    >
+                      {isLandscape ? "Rotate upright to Start" : "▶ Start 5s Countdown"}
+                    </button>
+                  )
                 ) : (
                   <div className="text-3xl font-black text-white font-mono bg-slate-900 px-6 py-1.5 rounded-xl border border-white/5 tracking-wider">
                     {sightingCountdown}s
@@ -2097,7 +2171,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                   <p>
                     <strong className="text-amber-400 uppercase tracking-wider text-[9px] block">📋 Easy Steps:</strong>
                     1. Sight along the top edge to target.<br/>
-                    2. Tap <strong>Start 5s Countdown</strong>, then hold perfectly still until the double-beep.
+                    2. Tap <strong>Start 5s Countdown</strong>, hold steady, then wait for the shutter click.
                   </p>
                 </div>
               </div>
@@ -2108,6 +2182,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 e.stopPropagation();
                 setSightingTarget(null);
                 setSightingCountdown(null);
+                setIsWaitingForStable(false);
               }}
               className="mt-1 font-bold uppercase tracking-wider text-[10px] border border-white/20 hover:border-white/40 text-slate-400 py-1.5 px-5 rounded-full active:scale-95 transition-all"
             >
@@ -3636,7 +3711,7 @@ const App: React.FC = () => {
             <button onClick={() => { setViewingRecord(null); setView('bunker'); }} className="bg-slate-900 border border-white/5 rounded-[2.5rem] p-10 flex flex-col items-center justify-center shadow-2xl active:scale-95 transition-all animate-fade-in">
               <div className="w-16 h-16 bg-amber-600 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-amber-600/40"><Compass size={28} /></div>
               <h2 className="text-2xl font-bold mb-2 uppercase text-amber-500">Bunker Depth Calc</h2>
-              <p className="text-white text-[13px] font-medium text-center max-w-[220px]">Pot bunker height & depth calculator</p>
+              <p className="text-white text-[13px] font-medium text-center max-w-[220px]">Bunker height & depth calculator</p>
             </button>
             <button onClick={() => setView('manual')} className="mt-2 bg-slate-800/50 border border-white/10 rounded-[1.8rem] py-6 flex items-center justify-center gap-4 active:bg-slate-700 transition-colors">
               <BookOpen size={20} className="text-blue-400" />
