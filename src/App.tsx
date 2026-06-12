@@ -1383,8 +1383,8 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
   const eyeDistanceFt = unitSystem === 'Metric' ? eyeDistance / 0.3048 : eyeDistance;
 
   return (
-    <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-3 flex flex-col items-center justify-center w-full animate-in fade-in duration-200">
-      <div className="text-[10px] font-black tracking-widest text-white uppercase mb-2">Trigonometry & Reference Diagram</div>
+    <div className="bg-slate-950/40 border border-white/5 rounded-2xl py-2 px-3 flex flex-col items-center justify-center w-full animate-in fade-in duration-200">
+      <div className="text-[10px] font-black tracking-widest text-white uppercase mb-1.5">Trigonometry & Reference Diagram</div>
       <div className="relative w-full max-w-[340px] aspect-[16/9] bg-slate-950/80 rounded-xl overflow-hidden border border-white/5 flex items-center justify-center">
         <svg viewBox="0 0 320 180" className="w-full h-full text-xs font-medium select-none">
           {/* Base definitions */}
@@ -1397,6 +1397,9 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
             </marker>
             <marker id="arrow-indigo" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" fill="#6366f1" />
+            </marker>
+            <marker id="arrow-yellow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#facc15" />
             </marker>
             <marker id="arrow-slate" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffffff" />
@@ -1455,7 +1458,7 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
             const rad2 = toRad(angle2);
             
             const originX = 40;
-            const originY = 135;
+            const originY = 140;
             const groundY = 140;
             
             const visualDist = Math.max(70, Math.min(190, 30.0 / Math.tan(rad1)));
@@ -1463,7 +1466,7 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
             
             const dFeet = 3.0 * (Math.tan(toRad(stimpAngleLip)) / Math.tan(toRad(stimpAngleRef)));
             const visualDepth = 30.0 * (Math.tan(toRad(stimpAngleLip)) / Math.tan(toRad(stimpAngleRef)));
-            const visualDepthClamped = Math.max(35, Math.min(110, visualDepth));
+            const visualDepthClamped = Math.max(40, Math.min(105, visualDepth));
             const lipY = groundY - visualDepthClamped;
             
             return (
@@ -1474,17 +1477,17 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
                 {/* Eye / Sighting device block */}
                 <circle cx={originX} cy={originY} r="4" fill="#ffffff" />
                 <line x1={originX} y1={originY} x2={originX} y2={groundY} stroke="#ffffff" strokeWidth="1" />
-                <text x={originX} y={originY - 6} fill="#ffffff" className="text-[8px] font-bold" textAnchor="middle">Rater</text>
+                <text x={originX} y={originY - 8} fill="#ffffff" className="text-[8px] font-bold" textAnchor="middle">Rater</text>
+
+                {/* Bunker lip wall rising behind the Stimpmeter up to the lip corner */}
+                <path d={`M ${wallX - 30} 140 Q ${wallX - 10} 140 ${wallX} ${lipY} L ${wallX + 30} ${lipY}`} fill="none" stroke="#475569" strokeWidth="1.5" />
 
                 {/* Stimpmeter (3ft pole vertical at floor) */}
-                <line x1={wallX} y1="140" x2={wallX} y2="110" stroke="#f59e0b" strokeWidth="4" strokeLinecap="round" />
+                <line x1={wallX} y1="140" x2={wallX} y2="105" stroke="#f59e0b" strokeWidth="4" strokeLinecap="round" />
                 <text x={wallX - 8} y="125" fill="#f59e0b" className="text-[8px] font-black" textAnchor="end">3.0' Stimp</text>
 
-                {/* Bunker lip wall */}
-                <path d={`M ${wallX} 140 L ${wallX + 40} 140 L ${wallX + 40} ${lipY}`} fill="none" stroke="#475569" strokeWidth="1" />
-
                 {/* Sight line to top of Stimpmeter (theta 1) */}
-                <line x1={originX} y1={originY} x2={wallX} y2="110" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="2 1" />
+                <line x1={originX} y1={originY} x2={wallX} y2="105" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="2 1" />
                 
                 {/* Sight line to top of Lip (theta 2) */}
                 <line x1={originX} y1={originY} x2={wallX} y2={lipY} stroke="#10b981" strokeWidth="1.2" strokeDasharray="2 1" />
@@ -1516,15 +1519,15 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
             const humanX = 60;
             const groundY = 140;
             
-            const eyeHeightVisual = Math.max(15, Math.min(50, eyeHeightFt * 6));
+            const eyeHeightVisual = Math.max(15, Math.min(45, eyeHeightFt * 5.2));
             const eyeY = groundY - eyeHeightVisual;
             
-            const distVisual = Math.max(60, Math.min(160, eyeDistanceFt * 6));
+            const distVisual = Math.max(60, Math.min(145, eyeDistanceFt * 5.2));
             const wallX = humanX + distVisual;
             
             const dFeet = eyeHeightFt + (eyeDistanceFt * Math.tan(toRad(eyeAngle)));
             const visualDepth = eyeHeightVisual + distVisual * Math.tan(rad);
-            const visualDepthClamped = Math.max(25, Math.min(125, visualDepth));
+            const visualDepthClamped = Math.max(25, Math.min(110, visualDepth));
             const lipY = groundY - visualDepthClamped;
             
             return (
@@ -1535,7 +1538,7 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
                 {/* Rater symbol */}
                 <circle cx={humanX} cy={groundY - 12} r="5" fill="#ffffff" />
                 <line x1={humanX} y1={groundY} x2={humanX} y2={groundY - 8} stroke="#ffffff" strokeWidth="2" />
-                <circle cx={humanX} cy={eyeY} r="2.5" fill="#f59e0b" /> {/* Eye point */}
+                <circle cx={humanX} cy={eyeY} r="2.5" fill="#ffffff" /> {/* Eye point */}
 
                 {/* Eye Height label left */}
                 <line x1="35" y1={groundY} x2="35" y2={eyeY} stroke="#ffffff" strokeWidth="1.2" markerStart="url(#arrow-slate)" markerEnd="url(#arrow-slate)" />
@@ -1545,15 +1548,15 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
                 <line x1={humanX} y1={eyeY} x2={wallX} y2={eyeY} stroke="#64748b" strokeWidth="1.2" strokeDasharray="3 3" />
                 
                 {/* Sight line to lip */}
-                <line x1={humanX} y1={eyeY} x2={wallX} y2={lipY} stroke="#f59e0b" strokeWidth="1.5" />
+                <line x1={humanX} y1={eyeY} x2={wallX} y2={lipY} stroke="#10b981" strokeWidth="1.5" />
                 
                 {/* Angle label */}
-                <path d={`M ${humanX + 25} ${eyeY} A 25 25 0 0 0 ${humanX + 25 * Math.cos(rad)} ${eyeY - 25 * Math.sin(rad)}`} fill="none" stroke="#f59e0b" strokeWidth="1" />
-                <text x={humanX + 28} y={eyeY - 12} fill="#f59e0b" className="font-mono text-[8px] font-bold">θ={eyeAngle}°</text>
+                <path d={`M ${humanX + 25} ${eyeY} A 25 25 0 0 0 ${humanX + 25 * Math.cos(rad)} ${eyeY - 25 * Math.sin(rad)}`} fill="none" stroke="#10b981" strokeWidth="1" />
+                <text x={humanX + 28} y={eyeY - 12} fill="#10b981" className="font-mono text-[8px] font-bold">θ={eyeAngle}°</text>
 
                 {/* D distance label */}
-                <line x1={humanX} y1={eyeY - 18} x2={wallX} y2={eyeY - 18} stroke="#38bdf8" strokeWidth="1.2" markerStart="url(#arrow-slate)" markerEnd="url(#arrow-slate)" />
-                <text x={(humanX + wallX) / 2} y={eyeY - 22} fill="#38bdf8" className="text-[8px] font-black font-mono" textAnchor="middle">
+                <line x1={humanX} y1={eyeY - 18} x2={wallX} y2={eyeY - 18} stroke="#facc15" strokeWidth="1.2" markerStart="url(#arrow-yellow)" markerEnd="url(#arrow-yellow)" />
+                <text x={(humanX + wallX) / 2} y={eyeY - 22} fill="#facc15" className="text-[8px] font-black font-mono" textAnchor="middle">
                   D = {unitSystem === 'Metric' ? `${eyeDistance.toFixed(1)}m` : `${eyeDistance.toFixed(1)}'`}
                 </text>
 
@@ -1577,13 +1580,13 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
             const humanX = 240;
             const groundY = 140;
             
-            const eyeHeightVisual = Math.max(15, Math.min(40, eyeHeightFt * 6));
+            const eyeHeightVisual = Math.max(12, Math.min(25, eyeHeightFt * 4.2));
             
-            const distVisual = Math.max(60, Math.min(160, eyeDistanceFt * 6));
+            const distVisual = Math.max(60, Math.min(140, eyeDistanceFt * 5));
             const bottomX = humanX - distVisual;
             
             const visualDepth = distVisual * Math.tan(rad) - eyeHeightVisual;
-            const visualDepthClamped = Math.max(20, Math.min(110, visualDepth));
+            const visualDepthClamped = Math.max(20, Math.min(75, visualDepth));
             
             const lipY = groundY - visualDepthClamped;
             const eyeY = lipY - eyeHeightVisual;
@@ -1599,7 +1602,7 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
                 {/* Rater standing on top lip */}
                 <circle cx={humanX} cy={lipY - 12} r="5" fill="#ffffff" />
                 <line x1={humanX} y1={lipY} x2={humanX} y2={lipY - 8} stroke="#ffffff" strokeWidth="2" />
-                <circle cx={humanX} cy={eyeY} r="2.5" fill="#f59e0b" /> {/* Eye point */}
+                <circle cx={humanX} cy={eyeY} r="2.5" fill="#ffffff" /> {/* Eye point */}
 
                 {/* Eye height offset on lip */}
                 <line x1={humanX + 12} y1={lipY} x2={humanX + 12} y2={eyeY} stroke="#ffffff" strokeWidth="1" />
@@ -1609,17 +1612,17 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
                 <line x1={bottomX} y1={eyeY} x2={humanX} y2={eyeY} stroke="#64748b" strokeWidth="1.2" strokeDasharray="3 3" />
                 
                 {/* D distance */}
-                <line x1={bottomX} y1={eyeY - 10} x2={humanX} y2={eyeY - 10} stroke="#38bdf8" strokeWidth="1.2" markerStart="url(#arrow-slate)" markerEnd="url(#arrow-slate)" />
-                <text x={(bottomX + humanX)/2} y={eyeY - 14} fill="#38bdf8" className="text-[8px] font-black font-mono" textAnchor="middle">
+                <line x1={bottomX} y1={eyeY - 10} x2={humanX} y2={eyeY - 10} stroke="#facc15" strokeWidth="1.2" markerStart="url(#arrow-yellow)" markerEnd="url(#arrow-yellow)" />
+                <text x={(bottomX + humanX)/2} y={eyeY - 14} fill="#facc15" className="text-[8px] font-black font-mono" textAnchor="middle">
                   D = {unitSystem === 'Metric' ? `${eyeDistance.toFixed(1)}m` : `${eyeDistance.toFixed(1)}'`}
                 </text>
 
                 {/* Sight line from eye to bottom deepest spot */}
-                <line x1={humanX} y1={eyeY} x2={bottomX} y2={groundY} stroke="#f59e0b" strokeWidth="1.5" />
+                <line x1={humanX} y1={eyeY} x2={bottomX} y2={groundY} stroke="#10b981" strokeWidth="1.5" />
                 
                 {/* Angle marker at eye looking down */}
-                <path d={`M ${humanX - 25} ${eyeY} A 25 25 0 0 1 ${humanX - 25 * Math.cos(rad)} ${eyeY + 25 * Math.sin(rad)}`} fill="none" stroke="#f59e0b" strokeWidth="1" />
-                <text x={humanX - 58} y={eyeY + 12} fill="#f59e0b" className="font-mono text-[8px] font-bold">θ={eyeAngle}°</text>
+                <path d={`M ${humanX - 25} ${eyeY} A 25 25 0 0 1 ${humanX - 25 * Math.cos(rad)} ${eyeY + 25 * Math.sin(rad)}`} fill="none" stroke="#10b981" strokeWidth="1" />
+                <text x={humanX - 58} y={eyeY + 12} fill="#10b981" className="font-mono text-[8px] font-bold">θ={eyeAngle}°</text>
 
                 {/* Bunker vertical depth bracket */}
                 <line x1="30" y1={groundY} x2="30" y2={lipY} stroke="#10b981" strokeWidth="1.5" markerStart="url(#arrow-emerald)" markerEnd="url(#arrow-emerald)" />
@@ -1642,22 +1645,22 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
             
             const groundY = 140;
             
-            const eyeHeightVisual = Math.max(20, Math.min(45, eyeHeightFt * 6));
+            const eyeHeightVisual = Math.max(16, Math.min(35, eyeHeightFt * 4.8));
             const eyeY = groundY - eyeHeightVisual;
             
             const human1X = 140;
-            const stepDistVisual = Math.max(30, Math.min(75, stepDistance * 10));
+            const stepDistVisual = Math.max(30, Math.min(70, stepDistance * 10));
             const human2X = human1X - stepDistVisual;
             
             const tan1 = Math.tan(rad1);
             const tan2 = Math.tan(rad2);
             const den = Math.max(0.01, tan1 - tan2);
             const visualD1 = stepDistVisual * (tan2 / den);
-            const visualD1Clamped = Math.max(30, Math.min(95, visualD1));
+            const visualD1Clamped = Math.max(30, Math.min(85, visualD1));
             
             const lipX = human1X + visualD1Clamped;
             const visualLipHeightAboveEye = visualD1Clamped * tan1;
-            const visualLipHeightAboveEyeClamped = Math.max(15, Math.min(80, visualLipHeightAboveEye));
+            const visualLipHeightAboveEyeClamped = Math.max(15, Math.min(70, visualLipHeightAboveEye));
             const lipY = eyeY - visualLipHeightAboveEyeClamped;
             
             const totalHClamped = eyeHeightVisual + visualLipHeightAboveEyeClamped;
@@ -1729,11 +1732,25 @@ const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
 };
 
 const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<'stimp' | 'eye' | 'step'>('stimp');
+  const [activeTab, setActiveTab] = useState<'stimp' | 'eye' | 'step'>(() => {
+    const saved = localStorage.getItem('bunker_active_tab');
+    return (saved === 'stimp' || saved === 'eye' || saved === 'step') ? saved : 'stimp';
+  });
   
+  const [unitSystem, setUnitSystem] = useState<'Imperial' | 'Metric'>(() => {
+    const saved = localStorage.getItem('bunker_unit_system');
+    return (saved === 'Imperial' || saved === 'Metric') ? saved : 'Imperial';
+  });
+
   // App-wide calibrations
-  const [eyeHeight, setEyeHeight] = useState<number>(5.5); // Default rater eye height
-  const [unitSystem, setUnitSystem] = useState<'Imperial' | 'Metric'>('Imperial');
+  const [eyeHeight, setEyeHeight] = useState<number>(() => {
+    const saved = localStorage.getItem('bunker_eye_height');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 5.5; // Default rater eye height
+  });
 
   // Device orientation / Live tilt state
   const [liveAngle, setLiveAngle] = useState<number>(0);
@@ -1748,20 +1765,135 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
   const [isStable, setIsStable] = useState<boolean>(false);
 
   // Method 1: Stimpmeter
-  const [stimpSubMode, setStimpSubMode] = useState<'slope' | 'distance'>('slope');
-  const [stimpSlopeAngle, setStimpSlopeAngle] = useState<number>(35); // Degrees
-  const [stimpAngleRef, setStimpAngleRef] = useState<number>(15); // θ1 to top of stimp
-  const [stimpAngleLip, setStimpAngleLip] = useState<number>(40); // θ2 to top of lip
+  const [stimpSubMode, setStimpSubMode] = useState<'slope' | 'distance'>(() => {
+    const saved = localStorage.getItem('bunker_stimp_sub_mode');
+    return (saved === 'slope' || saved === 'distance') ? saved : 'slope';
+  });
+  const [stimpSlopeAngle, setStimpSlopeAngle] = useState<number>(() => {
+    const saved = localStorage.getItem('bunker_stimp_slope_angle');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 35; // Degrees
+  });
+  const [stimpAngleRef, setStimpAngleRef] = useState<number>(() => {
+    const saved = localStorage.getItem('bunker_stimp_angle_ref');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 15; // θ1 to top of stimp
+  });
+  const [stimpAngleLip, setStimpAngleLip] = useState<number>(() => {
+    const saved = localStorage.getItem('bunker_stimp_angle_lip');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 40; // θ2 to top of lip
+  });
 
   // Method 2: Eye-Height
-  const [eyeSubMode, setEyeSubMode] = useState<'bottom_up' | 'top_down'>('bottom_up');
-  const [eyeDistance, setEyeDistance] = useState<number>(4.0); // estimated distance in feet
-  const [eyeAngle, setEyeAngle] = useState<number>(30); // elevation/depression angle
+  const [eyeSubMode, setEyeSubMode] = useState<'bottom_up' | 'top_down'>(() => {
+    const saved = localStorage.getItem('bunker_eye_sub_mode');
+    return (saved === 'bottom_up' || saved === 'top_down') ? saved : 'bottom_up';
+  });
+  const [eyeDistance, setEyeDistance] = useState<number>(() => {
+    const saved = localStorage.getItem('bunker_eye_distance');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 4.0; // estimated distance in feet
+  });
+  const [eyeAngle, setEyeAngle] = useState<number>(() => {
+    const saved = localStorage.getItem('bunker_eye_angle');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 30; // elevation/depression angle
+  });
+
+  // Persist bunker configurations
+  useEffect(() => {
+    localStorage.setItem('bunker_active_tab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_unit_system', unitSystem);
+  }, [unitSystem]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_eye_height', eyeHeight.toString());
+  }, [eyeHeight]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_eye_distance', eyeDistance.toString());
+  }, [eyeDistance]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_eye_sub_mode', eyeSubMode);
+  }, [eyeSubMode]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_stimp_sub_mode', stimpSubMode);
+  }, [stimpSubMode]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_stimp_slope_angle', stimpSlopeAngle.toString());
+  }, [stimpSlopeAngle]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_stimp_angle_ref', stimpAngleRef.toString());
+  }, [stimpAngleRef]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_stimp_angle_lip', stimpAngleLip.toString());
+  }, [stimpAngleLip]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_eye_angle', eyeAngle.toString());
+  }, [eyeAngle]);
 
   // Method 3: Step-Back
-  const [stepDistance, setStepDistance] = useState<number>(3.0); // distance of one step (ft)
-  const [stepAngle1, setStepAngle1] = useState<number>(45); // close elevation angle
-  const [stepAngle2, setStepAngle2] = useState<number>(25); // stepped-back elevation angle
+  const [stepDistance, setStepDistance] = useState<number>(() => {
+    const saved = localStorage.getItem('bunker_step_distance');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 3.0; // distance of one step (ft)
+  });
+  const [stepAngle1, setStepAngle1] = useState<number>(() => {
+    const saved = localStorage.getItem('bunker_step_angle_1');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 45; // close elevation angle
+  });
+  const [stepAngle2, setStepAngle2] = useState<number>(() => {
+    const saved = localStorage.getItem('bunker_step_angle_2');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 25; // stepped-back elevation angle
+  });
+
+  useEffect(() => {
+    localStorage.setItem('bunker_step_distance', stepDistance.toString());
+  }, [stepDistance]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_step_angle_1', stepAngle1.toString());
+  }, [stepAngle1]);
+
+  useEffect(() => {
+    localStorage.setItem('bunker_step_angle_2', stepAngle2.toString());
+  }, [stepAngle2]);
 
   const [isLandscape, setIsLandscape] = useState<boolean>(false);
   const [isMobileLandscape, setIsMobileLandscape] = useState<boolean>(false);
@@ -2061,19 +2193,19 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       <div className="grid grid-cols-3 gap-1 bg-slate-900/80 p-1 rounded-2xl border border-white/5 mb-4">
         <button 
           onClick={() => { setActiveTab('stimp'); setSensorsActive(false); }} 
-          className={`py-3 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider text-center transition-all ${activeTab === 'stimp' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider text-center transition-all ${activeTab === 'stimp' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-200 hover:text-white'}`}
         >
           1. Stimpmeter
         </button>
         <button 
           onClick={() => { setActiveTab('eye'); setSensorsActive(false); }} 
-          className={`py-3 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider text-center transition-all ${activeTab === 'eye' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider text-center transition-all ${activeTab === 'eye' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-200 hover:text-white'}`}
         >
           2. Eye-Height
         </button>
         <button 
           onClick={() => { setActiveTab('step'); setSensorsActive(false); }} 
-          className={`py-3 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider text-center transition-all ${activeTab === 'step' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+          className={`py-3 px-1 rounded-xl text-[10px] font-black uppercase tracking-wider text-center transition-all ${activeTab === 'step' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-200 hover:text-white'}`}
         >
           3. Step-Back
         </button>
@@ -2082,7 +2214,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       {/* Global Config (Eye Height & Unit System) */}
       <div className="bg-slate-900/50 border border-white/5 rounded-[1.5rem] p-3 mb-4 grid grid-cols-2 gap-4">
         <div>
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Rater Eye Height</label>
+          <label className="text-[9px] font-black text-white uppercase tracking-widest block mb-1">Rater Eye Height</label>
           <div className="flex items-center gap-2">
             <span className="text-white font-mono text-sm font-bold">{formatEyeHeight(eyeHeight)}</span>
             <input 
@@ -2092,12 +2224,12 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
               step={unitSystem === 'Imperial' ? "0.0833333" : "0.01"}
               value={eyeHeight} 
               onChange={(e) => setEyeHeight(parseFloat(e.target.value))}
-              className="flex-1 accent-amber-500 h-1 bg-slate-800 rounded-lg appearance-none"
+              className="flex-1 accent-white h-1 bg-slate-800 rounded-lg appearance-none"
             />
           </div>
         </div>
         <div>
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Unit Output</label>
+          <label className="text-[9px] font-black text-white uppercase tracking-widest block mb-1">Unit Output</label>
           <div className="grid grid-cols-2 gap-1 bg-slate-950 p-0.5 rounded-lg border border-white/5">
             <button 
               onClick={() => {
@@ -2109,7 +2241,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                   setEyeDistance(Math.min(25.0, Math.max(1.0, Math.round(convertedDist * 2) / 2)));
                 }
               }} 
-              className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Imperial' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+              className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Imperial' ? 'bg-slate-800 text-amber-500' : 'text-white'}`}
             >
               Ft / In
             </button>
@@ -2123,7 +2255,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                   setEyeDistance(Math.min(8.0, Math.max(0.3, Math.round(convertedDist * 10) / 10)));
                 }
               }} 
-              className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Metric' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+              className={`py-1 text-[9px] font-bold uppercase rounded ${unitSystem === 'Metric' ? 'bg-slate-800 text-amber-500' : 'text-white'}`}
             >
               Metres
             </button>
@@ -2203,21 +2335,21 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
       </div>
 
       {/* Main Interactive Work Area */}
-      <div className="bg-slate-900/30 border border-white/5 rounded-[1.8rem] p-4 flex-1 flex flex-col gap-4">
+      <div className="bg-slate-900/30 border border-white/5 rounded-[1.8rem] p-4 flex-1 flex flex-col gap-3">
         
         {/* Method 1: Stimpmeter (3ft length) */}
         {activeTab === 'stimp' && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl">
               <button 
                 onClick={() => setStimpSubMode('slope')} 
-                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${stimpSubMode === 'slope' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${stimpSubMode === 'slope' ? 'bg-slate-800 text-amber-500' : 'text-white'}`}
               >
                 Laid Flat on Face
               </button>
               <button 
                 onClick={() => setStimpSubMode('distance')} 
-                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${stimpSubMode === 'distance' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${stimpSubMode === 'distance' ? 'bg-slate-800 text-amber-500' : 'text-white'}`}
               >
                 Dual Angle Sight
               </button>
@@ -2259,6 +2391,14 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                       <button onClick={() => adjustVal(stimpAngleRef, setStimpAngleRef, -1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
                       <button onClick={() => adjustVal(stimpAngleRef, setStimpAngleRef, 1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
                     </div>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="89" 
+                      value={stimpAngleRef} 
+                      onChange={(e) => setStimpAngleRef(parseInt(e.target.value))}
+                      className="w-full mt-2 accent-amber-500" 
+                    />
                   </div>
 
                   <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center">
@@ -2268,6 +2408,14 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                       <button onClick={() => adjustVal(stimpAngleLip, setStimpAngleLip, -1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
                       <button onClick={() => adjustVal(stimpAngleLip, setStimpAngleLip, 1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
                     </div>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="89" 
+                      value={stimpAngleLip} 
+                      onChange={(e) => setStimpAngleLip(parseInt(e.target.value))}
+                      className="w-full mt-2 accent-emerald-500" 
+                    />
                   </div>
                 </div>
               </div>
@@ -2293,17 +2441,17 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
 
         {/* Method 2: Eye-Height */}
         {activeTab === 'eye' && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl">
               <button 
                 onClick={() => setEyeSubMode('bottom_up')} 
-                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${eyeSubMode === 'bottom_up' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${eyeSubMode === 'bottom_up' ? 'bg-slate-800 text-amber-500' : 'text-white'}`}
               >
                 At Bottom, Look Up
               </button>
               <button 
                 onClick={() => setEyeSubMode('top_down')} 
-                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${eyeSubMode === 'top_down' ? 'bg-slate-800 text-amber-500' : 'text-slate-400'}`}
+                className={`py-2 text-[10px] font-black uppercase rounded-lg tracking-wider ${eyeSubMode === 'top_down' ? 'bg-slate-800 text-amber-500' : 'text-white'}`}
               >
                 On Lip, Look Down
               </button>
@@ -2318,7 +2466,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
 
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center animate-in fade-in duration-300">
-                <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider block mb-1">Separation Dist</span>
+                <span className="text-[9px] font-black text-yellow-400 uppercase tracking-wider block mb-1">Separation Dist</span>
                 <span className="text-2xl font-black text-white font-mono mb-1">
                   {unitSystem === 'Metric' ? `${eyeDistance.toFixed(1)} m` : `${eyeDistance.toFixed(1)}' ft`}
                 </span>
@@ -2343,7 +2491,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                   step={unitSystem === 'Metric' ? "0.1" : "0.5"}
                   value={eyeDistance} 
                   onChange={(e) => setEyeDistance(parseFloat(e.target.value))}
-                  className="w-full accent-amber-500" 
+                  className="w-full accent-yellow-400" 
                 />
               </div>
 
@@ -2385,7 +2533,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
 
         {/* Method 3: Step-Back */}
         {activeTab === 'step' && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <p className="text-xs sm:text-sm text-white font-medium leading-normal text-center mb-1">
               Stand inside looking up. Measure closer angle (θ1). Step back 1 standard pace (e.g. 3ft) and measure far angle (θ2). No distance guess required!
             </p>
@@ -2399,7 +2547,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
             </div>
 
             <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center mb-1">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">One Pace Step Distance</span>
+              <span className="text-[9px] font-black text-white uppercase tracking-wider mb-1">One Pace Step Distance</span>
               <div className="flex items-center gap-4">
                 <button onClick={() => adjustVal(stepDistance, setStepDistance, -0.5, 1.5, 5.0)} className="w-8 h-8 bg-slate-800 rounded-full text-white font-bold flex items-center justify-center">-</button>
                 <span className="text-xl font-bold font-mono text-white">{stepDistance.toFixed(1)} feet</span>
@@ -2415,6 +2563,14 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                   <button onClick={() => adjustVal(stepAngle1, setStepAngle1, -1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
                   <button onClick={() => adjustVal(stepAngle1, setStepAngle1, 1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
                 </div>
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="89" 
+                  value={stepAngle1} 
+                  onChange={(e) => setStepAngle1(parseInt(e.target.value))}
+                  className="w-full mt-2 accent-amber-500" 
+                />
               </div>
 
               <div className="bg-slate-900/60 p-3 rounded-2xl flex flex-col items-center">
@@ -2424,6 +2580,14 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                   <button onClick={() => adjustVal(stepAngle2, setStepAngle2, -1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">-</button>
                   <button onClick={() => adjustVal(stepAngle2, setStepAngle2, 1, 1, 89)} className="w-8 h-8 bg-slate-800 rounded-full text-white text-xs font-bold flex items-center justify-center">+</button>
                 </div>
+                <input 
+                  type="range" 
+                  min="1" 
+                  max="89" 
+                  value={stepAngle2} 
+                  onChange={(e) => setStepAngle2(parseInt(e.target.value))}
+                  className="w-full mt-2 accent-indigo-500" 
+                />
               </div>
             </div>
 
@@ -2454,15 +2618,15 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
         )}
 
         {/* Calculated Results Area */}
-        <div className="mt-auto pt-4 border-t border-white/5 flex flex-col gap-3">
-          <div className="text-center text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="mt-2.5 pt-3 border-t border-white/5 flex flex-col gap-2.5">
+          <div className="text-center text-[10px] font-bold uppercase tracking-wider text-white">
             <span>Resulting Bunker Depth & Manual Adjustments</span>
           </div>
 
-          <div className="bg-[#0b1329] border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center">
+          <div className="bg-[#0b1329] border border-white/5 rounded-2xl p-3 flex flex-col items-center justify-center">
             {depthFeet > 0 ? (
               <div className="flex flex-col items-center text-center animate-in zoom-in-95 duration-200 w-full">
-                <span className="text-[10px] uppercase font-black text-slate-300 mb-1 tracking-wider">Vertical Depth</span>
+                <span className="text-[10px] uppercase font-black text-white mb-1 tracking-wider">Vertical Depth</span>
                 <span className="text-5xl font-black text-amber-500 tracking-tight font-mono mb-2">
                   {formatDepth(depthFeet)}
                 </span>
@@ -2488,7 +2652,7 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 </div>
               </div>
             ) : (
-              <div className="py-4 text-center text-slate-500 font-medium text-xs">
+              <div className="py-4 text-center text-white/90 font-medium text-xs">
                 Enter or capture sighting values above to calculate deep bunker vertical heights.
               </div>
             )}
