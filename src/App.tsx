@@ -1346,6 +1346,388 @@ const playCameraShutterSound = () => {
   }
 };
 
+interface BunkerTrigDiagramProps {
+  activeTab: 'stimp' | 'eye' | 'step';
+  stimpSubMode: 'slope' | 'distance';
+  eyeSubMode: 'bottom_up' | 'top_down';
+  stimpSlopeAngle: number;
+  stimpAngleRef: number;
+  stimpAngleLip: number;
+  eyeHeight: number;
+  eyeDistance: number;
+  eyeAngle: number;
+  stepDistance: number;
+  stepAngle1: number;
+  stepAngle2: number;
+  unitSystem: 'Imperial' | 'Metric';
+}
+
+const BunkerTrigDiagram: React.FC<BunkerTrigDiagramProps> = ({
+  activeTab,
+  stimpSubMode,
+  eyeSubMode,
+  stimpSlopeAngle,
+  stimpAngleRef,
+  stimpAngleLip,
+  eyeHeight,
+  eyeDistance,
+  eyeAngle,
+  stepDistance,
+  stepAngle1,
+  stepAngle2,
+  unitSystem
+}) => {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  
+  const eyeHeightFt = unitSystem === 'Metric' ? eyeHeight / 0.3048 : eyeHeight;
+  const eyeDistanceFt = unitSystem === 'Metric' ? eyeDistance / 0.3048 : eyeDistance;
+
+  return (
+    <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-3 flex flex-col items-center justify-center w-full animate-in fade-in duration-200">
+      <div className="text-[10px] font-black tracking-widest text-white uppercase mb-2">Trigonometry & Reference Diagram</div>
+      <div className="relative w-full max-w-[340px] aspect-[16/9] bg-slate-950/80 rounded-xl overflow-hidden border border-white/5 flex items-center justify-center">
+        <svg viewBox="0 0 320 180" className="w-full h-full text-xs font-medium select-none">
+          {/* Base definitions */}
+          <defs>
+            <marker id="arrow-amber" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
+            </marker>
+            <marker id="arrow-emerald" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981" />
+            </marker>
+            <marker id="arrow-indigo" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#6366f1" />
+            </marker>
+            <marker id="arrow-slate" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffffff" />
+            </marker>
+          </defs>
+
+          {activeTab === 'stimp' && stimpSubMode === 'slope' && (() => {
+            const angle = Math.max(10, Math.min(80, stimpSlopeAngle));
+            const rad = toRad(angle);
+            const baseX = 240;
+            const baseY = 140;
+            const len = 120;
+            const topX = baseX - len * Math.cos(rad);
+            const topY = baseY - len * Math.sin(rad);
+            const dFeet = 3.0 * Math.sin(toRad(stimpSlopeAngle));
+            
+            return (
+              <>
+                {/* Horizontal ground reference */}
+                <line x1="30" y1={baseY} x2="290" y2={baseY} stroke="#334155" strokeWidth="1.5" strokeDasharray="3 3" />
+                
+                {/* Bunker Face */}
+                <path d={`M ${baseX + 20} ${baseY} L ${baseX - 150 * Math.cos(rad)} ${baseY - 150 * Math.sin(rad)}`} fill="none" stroke="#475569" strokeWidth="1" />
+                
+                {/* Right angle symbol indicator */}
+                <path d={`M ${topX} ${baseY - 8} L ${topX + 8} ${baseY - 8} L ${topX + 8} ${baseY}`} fill="none" stroke="#64748b" strokeWidth="1" />
+
+                {/* Vertical drop (Calculated depth) */}
+                <line x1={topX} y1={topY} x2={topX} y2={baseY} stroke="#10b981" strokeWidth="2" strokeDasharray="2 2" markerEnd="url(#arrow-emerald)" />
+                
+                {/* Stimpmeter flat along face */}
+                <line x1={baseX} y1={baseY} x2={topX} y2={topY} stroke="#f59e0b" strokeWidth="4" strokeLinecap="round" />
+                
+                {/* Angled arc */}
+                <path d={`M ${baseX - 25} ${baseY} A 25 25 0 0 1 ${baseX - 25 * Math.cos(rad)} ${baseY - 25 * Math.sin(rad)}`} fill="none" stroke="#f59e0b" strokeWidth="1.5" />
+                
+                {/* Labels */}
+                <text x={baseX - 45} y={baseY - 8} fill="#f59e0b" className="font-bold font-mono text-[10px]">θ = {stimpSlopeAngle}°</text>
+                <text x={(baseX + topX) / 2 + 10} y={(baseY + topY) / 2 - 10} fill="#f59e0b" className="font-bold text-[9px]" textAnchor="middle">Stimpmeter (3.0 ft)</text>
+                
+                <text x={topX - 10} y={(topY + baseY) / 2 + 3} fill="#10b981" className="font-bold text-[10px] font-mono" textAnchor="end">
+                  Depth: {stimpSlopeAngle > 0 ? (unitSystem === 'Metric' ? `${(dFeet * 0.3048).toFixed(2)}m` : `${dFeet.toFixed(1)}'`) : '0'}
+                </text>
+                
+                <text x="160" y="165" fill="#ffffff" className="text-[8px] font-bold tracking-wider uppercase" textAnchor="middle">
+                  Formula: Depth = 3.0' × sin(θ)
+                </text>
+              </>
+            );
+          })()}
+
+          {activeTab === 'stimp' && stimpSubMode === 'distance' && (() => {
+            const angle1 = Math.max(5, Math.min(60, stimpAngleRef));
+            const angle2 = Math.max(angle1 + 2, Math.min(85, stimpAngleLip));
+            const rad1 = toRad(angle1);
+            const rad2 = toRad(angle2);
+            
+            const originX = 40;
+            const originY = 135;
+            const groundY = 140;
+            
+            const visualDist = Math.max(70, Math.min(190, 30.0 / Math.tan(rad1)));
+            const wallX = originX + visualDist;
+            
+            const dFeet = 3.0 * (Math.tan(toRad(stimpAngleLip)) / Math.tan(toRad(stimpAngleRef)));
+            const visualDepth = 30.0 * (Math.tan(toRad(stimpAngleLip)) / Math.tan(toRad(stimpAngleRef)));
+            const visualDepthClamped = Math.max(35, Math.min(110, visualDepth));
+            const lipY = groundY - visualDepthClamped;
+            
+            return (
+              <>
+                {/* Ground */}
+                <line x1="20" y1={groundY} x2="300" y2={groundY} stroke="#334155" strokeWidth="1.5" />
+                
+                {/* Eye / Sighting device block */}
+                <circle cx={originX} cy={originY} r="4" fill="#ffffff" />
+                <line x1={originX} y1={originY} x2={originX} y2={groundY} stroke="#ffffff" strokeWidth="1" />
+                <text x={originX} y={originY - 6} fill="#ffffff" className="text-[8px] font-bold" textAnchor="middle">Rater</text>
+
+                {/* Stimpmeter (3ft pole vertical at floor) */}
+                <line x1={wallX} y1="140" x2={wallX} y2="110" stroke="#f59e0b" strokeWidth="4" strokeLinecap="round" />
+                <text x={wallX - 8} y="125" fill="#f59e0b" className="text-[8px] font-black" textAnchor="end">3.0' Stimp</text>
+
+                {/* Bunker lip wall */}
+                <path d={`M ${wallX} 140 L ${wallX + 40} 140 L ${wallX + 40} ${lipY}`} fill="none" stroke="#475569" strokeWidth="1" />
+
+                {/* Sight line to top of Stimpmeter (theta 1) */}
+                <line x1={originX} y1={originY} x2={wallX} y2="110" stroke="#f59e0b" strokeWidth="1.2" strokeDasharray="2 1" />
+                
+                {/* Sight line to top of Lip (theta 2) */}
+                <line x1={originX} y1={originY} x2={wallX} y2={lipY} stroke="#10b981" strokeWidth="1.2" strokeDasharray="2 1" />
+
+                {/* Angle indicators */}
+                <path d={`M ${originX + 25} ${originY} A 25 25 0 0 0 ${originX + 25 * Math.cos(rad1)} ${originY - 25 * Math.sin(rad1)}`} fill="none" stroke="#f59e0b" strokeWidth="1" />
+                <path d={`M ${originX + 35} ${originY} A 35 35 0 0 0 ${originX + 35 * Math.cos(rad2)} ${originY - 35 * Math.sin(rad2)}`} fill="none" stroke="#10b981" strokeWidth="1" />
+
+                <text x={originX + 42} y={originY - 5} fill="#f59e0b" className="font-mono text-[8px] font-bold">θ1={stimpAngleRef}°</text>
+                <text x={originX + 42} y={originY - 18} fill="#10b981" className="font-mono text-[8px] font-bold">θ2={stimpAngleLip}°</text>
+
+                {/* Vertical Depth Bracket and Text */}
+                <line x1={wallX + 15} y1="140" x2={wallX + 15} y2={lipY} stroke="#10b981" strokeWidth="1.5" markerStart="url(#arrow-emerald)" markerEnd="url(#arrow-emerald)" />
+                <text x={wallX + 22} y={(140 + lipY) / 2 + 3} fill="#10b981" className="font-bold text-[10px] font-mono">
+                  Depth: {stimpAngleRef > 0 && stimpAngleLip >= stimpAngleRef ? (unitSystem === 'Metric' ? `${(dFeet * 0.3048).toFixed(2)}m` : `${dFeet.toFixed(1)}'`) : '0'}
+                </text>
+
+                <text x="160" y="165" fill="#ffffff" className="text-[8px] font-bold tracking-wider uppercase" textAnchor="middle">
+                  Formula: Depth = 3.0' × (tan(θ2) / tan(θ1))
+                </text>
+              </>
+            );
+          })()}
+
+          {activeTab === 'eye' && eyeSubMode === 'bottom_up' && (() => {
+            const angleVal = Math.max(5, Math.min(80, eyeAngle));
+            const rad = toRad(angleVal);
+            
+            const humanX = 60;
+            const groundY = 140;
+            
+            const eyeHeightVisual = Math.max(15, Math.min(50, eyeHeightFt * 6));
+            const eyeY = groundY - eyeHeightVisual;
+            
+            const distVisual = Math.max(60, Math.min(160, eyeDistanceFt * 6));
+            const wallX = humanX + distVisual;
+            
+            const dFeet = eyeHeightFt + (eyeDistanceFt * Math.tan(toRad(eyeAngle)));
+            const visualDepth = eyeHeightVisual + distVisual * Math.tan(rad);
+            const visualDepthClamped = Math.max(25, Math.min(125, visualDepth));
+            const lipY = groundY - visualDepthClamped;
+            
+            return (
+              <>
+                {/* Floor and wall structure */}
+                <path d={`M 30 ${groundY} L 120 ${groundY} Q 160 ${groundY} ${wallX} ${lipY}`} fill="none" stroke="#334155" strokeWidth="1.5" />
+                
+                {/* Rater symbol */}
+                <circle cx={humanX} cy={groundY - 12} r="5" fill="#ffffff" />
+                <line x1={humanX} y1={groundY} x2={humanX} y2={groundY - 8} stroke="#ffffff" strokeWidth="2" />
+                <circle cx={humanX} cy={eyeY} r="2.5" fill="#f59e0b" /> {/* Eye point */}
+
+                {/* Eye Height label left */}
+                <line x1="35" y1={groundY} x2="35" y2={eyeY} stroke="#ffffff" strokeWidth="1.2" markerStart="url(#arrow-slate)" markerEnd="url(#arrow-slate)" />
+                <text x="43" y={(groundY + eyeY) / 2 + 3} fill="#ffffff" className="text-[8px] font-black font-mono">EH: {unitSystem === 'Metric' ? `${eyeHeight.toFixed(2)}m` : `${Math.floor(eyeHeight)}'${Math.round((eyeHeight - Math.floor(eyeHeight)) * 12)}"`}</text>
+
+                {/* Eye level horizontal line */}
+                <line x1={humanX} y1={eyeY} x2={wallX} y2={eyeY} stroke="#64748b" strokeWidth="1.2" strokeDasharray="3 3" />
+                
+                {/* Sight line to lip */}
+                <line x1={humanX} y1={eyeY} x2={wallX} y2={lipY} stroke="#f59e0b" strokeWidth="1.5" />
+                
+                {/* Angle label */}
+                <path d={`M ${humanX + 25} ${eyeY} A 25 25 0 0 0 ${humanX + 25 * Math.cos(rad)} ${eyeY - 25 * Math.sin(rad)}`} fill="none" stroke="#f59e0b" strokeWidth="1" />
+                <text x={humanX + 28} y={eyeY - 12} fill="#f59e0b" className="font-mono text-[8px] font-bold">θ={eyeAngle}°</text>
+
+                {/* D distance label */}
+                <line x1={humanX} y1={eyeY - 18} x2={wallX} y2={eyeY - 18} stroke="#38bdf8" strokeWidth="1.2" markerStart="url(#arrow-slate)" markerEnd="url(#arrow-slate)" />
+                <text x={(humanX + wallX) / 2} y={eyeY - 22} fill="#38bdf8" className="text-[8px] font-black font-mono" textAnchor="middle">
+                  D = {unitSystem === 'Metric' ? `${eyeDistance.toFixed(1)}m` : `${eyeDistance.toFixed(1)}'`}
+                </text>
+
+                {/* Total depth indicator */}
+                <line x1={wallX + 15} y1={groundY} x2={wallX + 15} y2={lipY} stroke="#10b981" strokeWidth="1.5" markerStart="url(#arrow-emerald)" markerEnd="url(#arrow-emerald)" />
+                <text x={wallX + 22} y={(groundY + lipY) / 2 + 3} fill="#10b981" className="font-bold text-[10px] font-mono">
+                  Depth: {unitSystem === 'Metric' ? `${(dFeet * 0.3048).toFixed(2)}m` : `${dFeet.toFixed(1)}'`}
+                </text>
+
+                <text x="160" y="165" fill="#ffffff" className="text-[8px] font-bold tracking-wider uppercase" textAnchor="middle">
+                  Formula: Depth = Eye Height + (D × tan(θ))
+                </text>
+              </>
+            );
+          })()}
+
+          {activeTab === 'eye' && eyeSubMode === 'top_down' && (() => {
+            const angleVal = Math.max(5, Math.min(80, eyeAngle));
+            const rad = toRad(angleVal);
+            
+            const humanX = 240;
+            const groundY = 140;
+            
+            const eyeHeightVisual = Math.max(15, Math.min(40, eyeHeightFt * 6));
+            
+            const distVisual = Math.max(60, Math.min(160, eyeDistanceFt * 6));
+            const bottomX = humanX - distVisual;
+            
+            const visualDepth = distVisual * Math.tan(rad) - eyeHeightVisual;
+            const visualDepthClamped = Math.max(20, Math.min(110, visualDepth));
+            
+            const lipY = groundY - visualDepthClamped;
+            const eyeY = lipY - eyeHeightVisual;
+            
+            const dFeet = (eyeDistanceFt * Math.tan(toRad(eyeAngle))) - eyeHeightFt;
+            const isNegative = dFeet < 0;
+            
+            return (
+              <>
+                {/* Bunker floor and wall */}
+                <path d={`M 30 ${groundY} L ${bottomX} ${groundY} Q ${(bottomX + humanX)/2} ${groundY} ${humanX} ${lipY}`} fill="none" stroke="#334155" strokeWidth="1.5" />
+                
+                {/* Rater standing on top lip */}
+                <circle cx={humanX} cy={lipY - 12} r="5" fill="#ffffff" />
+                <line x1={humanX} y1={lipY} x2={humanX} y2={lipY - 8} stroke="#ffffff" strokeWidth="2" />
+                <circle cx={humanX} cy={eyeY} r="2.5" fill="#f59e0b" /> {/* Eye point */}
+
+                {/* Eye height offset on lip */}
+                <line x1={humanX + 12} y1={lipY} x2={humanX + 12} y2={eyeY} stroke="#ffffff" strokeWidth="1" />
+                <text x={humanX + 16} y={(lipY + eyeY)/2 + 3} fill="#ffffff" className="text-[7.5px] font-bold">EyeH</text>
+
+                {/* Eye level horizontal reference looking down */}
+                <line x1={bottomX} y1={eyeY} x2={humanX} y2={eyeY} stroke="#64748b" strokeWidth="1.2" strokeDasharray="3 3" />
+                
+                {/* D distance */}
+                <line x1={bottomX} y1={eyeY - 10} x2={humanX} y2={eyeY - 10} stroke="#38bdf8" strokeWidth="1.2" markerStart="url(#arrow-slate)" markerEnd="url(#arrow-slate)" />
+                <text x={(bottomX + humanX)/2} y={eyeY - 14} fill="#38bdf8" className="text-[8px] font-black font-mono" textAnchor="middle">
+                  D = {unitSystem === 'Metric' ? `${eyeDistance.toFixed(1)}m` : `${eyeDistance.toFixed(1)}'`}
+                </text>
+
+                {/* Sight line from eye to bottom deepest spot */}
+                <line x1={humanX} y1={eyeY} x2={bottomX} y2={groundY} stroke="#f59e0b" strokeWidth="1.5" />
+                
+                {/* Angle marker at eye looking down */}
+                <path d={`M ${humanX - 25} ${eyeY} A 25 25 0 0 1 ${humanX - 25 * Math.cos(rad)} ${eyeY + 25 * Math.sin(rad)}`} fill="none" stroke="#f59e0b" strokeWidth="1" />
+                <text x={humanX - 58} y={eyeY + 12} fill="#f59e0b" className="font-mono text-[8px] font-bold">θ={eyeAngle}°</text>
+
+                {/* Bunker vertical depth bracket */}
+                <line x1="30" y1={groundY} x2="30" y2={lipY} stroke="#10b981" strokeWidth="1.5" markerStart="url(#arrow-emerald)" markerEnd="url(#arrow-emerald)" />
+                <text x="36" y={isNegative ? 110 : (groundY + lipY)/2 + 3} fill="#10b981" className="font-bold text-[10px] font-mono">
+                  Depth: {!isNegative ? (unitSystem === 'Metric' ? `${(dFeet * 0.3048).toFixed(2)}m` : `${dFeet.toFixed(1)}'`) : 'Shallow'}
+                </text>
+
+                <text x="160" y="165" fill="#ffffff" className="text-[8px] font-bold tracking-wider uppercase" textAnchor="middle">
+                  Formula: Depth = (D × tan(θ)) - Eye Height
+                </text>
+              </>
+            );
+          })()}
+
+          {activeTab === 'step' && (() => {
+            const angleVal1 = Math.max(5, Math.min(80, stepAngle1));
+            const angleVal2 = Math.max(5, Math.min(stepAngle1 - 2, stepAngle2));
+            const rad1 = toRad(angleVal1);
+            const rad2 = toRad(angleVal2);
+            
+            const groundY = 140;
+            
+            const eyeHeightVisual = Math.max(20, Math.min(45, eyeHeightFt * 6));
+            const eyeY = groundY - eyeHeightVisual;
+            
+            const human1X = 140;
+            const stepDistVisual = Math.max(30, Math.min(75, stepDistance * 10));
+            const human2X = human1X - stepDistVisual;
+            
+            const tan1 = Math.tan(rad1);
+            const tan2 = Math.tan(rad2);
+            const den = Math.max(0.01, tan1 - tan2);
+            const visualD1 = stepDistVisual * (tan2 / den);
+            const visualD1Clamped = Math.max(30, Math.min(95, visualD1));
+            
+            const lipX = human1X + visualD1Clamped;
+            const visualLipHeightAboveEye = visualD1Clamped * tan1;
+            const visualLipHeightAboveEyeClamped = Math.max(15, Math.min(80, visualLipHeightAboveEye));
+            const lipY = eyeY - visualLipHeightAboveEyeClamped;
+            
+            const totalHClamped = eyeHeightVisual + visualLipHeightAboveEyeClamped;
+            
+            const num = Math.tan(toRad(stepAngle1)) * Math.tan(toRad(stepAngle2));
+            const equationDen = Math.tan(toRad(stepAngle1)) - Math.tan(toRad(stepAngle2));
+            const h_lip = stepDistance * (num / equationDen);
+            const totalH = eyeHeightFt + h_lip;
+
+            return (
+              <>
+                {/* Horizontal Level Eye-plane */}
+                <line x1="30" y1={eyeY} x2={lipX} y2={eyeY} stroke="#475569" strokeWidth="1" strokeDasharray="3 3" />
+                
+                {/* Ground */}
+                <line x1="20" y1={groundY} x2="280" y2={groundY} stroke="#334155" strokeWidth="1.2" />
+
+                {/* Sighting Point 1 (Close) */}
+                <circle cx={human1X} cy={groundY - 12} r="4" fill="#ffffff" />
+                <line x1={human1X} y1={groundY} x2={human1X} y2={groundY - 8} stroke="#ffffff" strokeWidth="1.5" />
+                <circle cx={human1X} cy={eyeY} r="2" fill="#f59e0b" />
+                <text x={human1X} y={groundY - 20} fill="#f59e0b" className="text-[7px] font-black" textAnchor="middle">θ1</text>
+
+                {/* Sighting Point 2 (Back) */}
+                <circle cx={human2X} cy={groundY - 12} r="4" fill="#ffffff" opacity="0.6" />
+                <line x1={human2X} y1={groundY} x2={human2X} y2={groundY - 8} stroke="#ffffff" strokeWidth="1.5" opacity="0.6" />
+                <circle cx={human2X} cy={eyeY} r="2" fill="#6366f1" />
+                <text x={human2X} y={groundY - 20} fill="#6366f1" className="text-[7px] font-black" textAnchor="middle">θ2</text>
+
+                {/* Distance d paces between point 1 and 2 */}
+                <line x1={human2X} y1={groundY + 8} x2={human1X} y2={groundY + 8} stroke="#38bdf8" strokeWidth="1" markerStart="url(#arrow-slate)" markerEnd="url(#arrow-slate)" />
+                <text x={(human2X + human1X)/2} y={groundY + 16} fill="#38bdf8" className="text-[7.5px] font-black font-mono" textAnchor="middle">
+                  Step = {stepDistance.toFixed(1)}'
+                </text>
+
+                {/* Upper bunker lip target point */}
+                <circle cx={lipX} cy={lipY} r="4" fill="#10b981" />
+                <text x={lipX + 8} y={lipY + 4} fill="#10b981" className="text-[8px] font-black">Lip</text>
+
+                {/* Sight line 1 (θ1) */}
+                <line x1={human1X} y1={eyeY} x2={lipX} y2={lipY} stroke="#f59e0b" strokeWidth="1.5" />
+                
+                {/* Sight line 2 (θ2) */}
+                <line x1={human2X} y1={eyeY} x2={lipX} y2={lipY} stroke="#6366f1" strokeWidth="1.2" />
+
+                {/* Arc indicators */}
+                <path d={`M ${human1X + 20} ${eyeY} A 20 20 0 0 0 ${human1X + 20 * Math.cos(rad1)} ${eyeY - 20 * Math.sin(rad1)}`} fill="none" stroke="#f59e0b" strokeWidth="1" />
+                <path d={`M ${human2X + 25} ${eyeY} A 25 25 0 0 0 ${human2X + 25 * Math.cos(rad2)} ${eyeY - 25 * Math.sin(rad2)}`} fill="none" stroke="#6366f1" strokeWidth="1" />
+
+                <text x={human1X + 24} y={eyeY - 5} fill="#f59e0b" className="font-mono text-[8px] font-bold">θ1={stepAngle1}°</text>
+                <text x={human2X + 29} y={eyeY - 12} fill="#6366f1" className="font-mono text-[8px] font-bold">θ2={stepAngle2}°</text>
+
+                {/* Total height bracket of Lip height + Eye height */}
+                <line x1={lipX + 15} y1={groundY} x2={lipX + 15} y2={lipY} stroke="#10b981" strokeWidth="1.5" markerStart="url(#arrow-emerald)" markerEnd="url(#arrow-emerald)" />
+                <text x={lipX + 22} y={(groundY + lipY) / 2 + 3} fill="#10b981" className="font-bold text-[10px] font-mono">
+                  Depth: {stepAngle1 > stepAngle2 ? (unitSystem === 'Metric' ? `${(totalH * 0.3048).toFixed(2)}m` : `${totalH.toFixed(1)}'`) : '0'}
+                </text>
+
+                <text x="140" y="172" fill="#ffffff" className="text-[7.5px] font-bold text-center uppercase" textAnchor="middle">
+                  Formula: Depth = EyeHeight + d × [ (tan θ1 × tan θ2) / (tan θ1 - tan θ2) ]
+                </text>
+              </>
+            );
+          })()}
+        </svg>
+      </div>
+    </div>
+  );
+};
+
 const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'stimp' | 'eye' | 'step'>('stimp');
   
@@ -1890,6 +2272,22 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 </div>
               </div>
             )}
+
+            <BunkerTrigDiagram
+              activeTab={activeTab}
+              stimpSubMode={stimpSubMode}
+              eyeSubMode={eyeSubMode}
+              stimpSlopeAngle={stimpSlopeAngle}
+              stimpAngleRef={stimpAngleRef}
+              stimpAngleLip={stimpAngleLip}
+              eyeHeight={eyeHeight}
+              eyeDistance={eyeDistance}
+              eyeAngle={eyeAngle}
+              stepDistance={stepDistance}
+              stepAngle1={stepAngle1}
+              stepAngle2={stepAngle2}
+              unitSystem={unitSystem}
+            />
           </div>
         )}
 
@@ -1966,6 +2364,22 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 />
               </div>
             </div>
+
+            <BunkerTrigDiagram
+              activeTab={activeTab}
+              stimpSubMode={stimpSubMode}
+              eyeSubMode={eyeSubMode}
+              stimpSlopeAngle={stimpSlopeAngle}
+              stimpAngleRef={stimpAngleRef}
+              stimpAngleLip={stimpAngleLip}
+              eyeHeight={eyeHeight}
+              eyeDistance={eyeDistance}
+              eyeAngle={eyeAngle}
+              stepDistance={stepDistance}
+              stepAngle1={stepAngle1}
+              stepAngle2={stepAngle2}
+              unitSystem={unitSystem}
+            />
           </div>
         )}
 
@@ -2012,6 +2426,22 @@ const BunkerDepthCalculator: React.FC<{ onClose: () => void }> = ({ onClose }) =
                 </div>
               </div>
             </div>
+
+            <BunkerTrigDiagram
+              activeTab={activeTab}
+              stimpSubMode={stimpSubMode}
+              eyeSubMode={eyeSubMode}
+              stimpSlopeAngle={stimpSlopeAngle}
+              stimpAngleRef={stimpAngleRef}
+              stimpAngleLip={stimpAngleLip}
+              eyeHeight={eyeHeight}
+              eyeDistance={eyeDistance}
+              eyeAngle={eyeAngle}
+              stepDistance={stepDistance}
+              stepAngle1={stepAngle1}
+              stepAngle2={stepAngle2}
+              unitSystem={unitSystem}
+            />
           </div>
         )}
 
