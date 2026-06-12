@@ -311,6 +311,12 @@ The App is able to display the 'Accuracy Pattern' in real-time for Scratch and B
     content: "This command will calculate the speed of a green by combining measurements in one direction and then the other. While the best procedure is to find a flat area on the green on which to stimp, when it is not possible to find a flat area to measure, refer to 'Course Rating Manual 9.Green Surface'. Find the most uniform area. Roll balls down and then up. Enter the averaged values into the App and it will calculate the corrected speed and contour category based on those values. It will also show the 'Green Surface Rating Table' values for scratch and bogey players."
   },
   {
+    title: "Bunker Calc",
+    color: "text-amber-500",
+    icon: <Compass className="text-amber-500" />,
+    content: "This command calculates vertical bunker depth and height using your mobile device's tilt sensors as a smart clinometer, or through manual sight angles. Sight the target by aligning the top edge of your phone like a gun-sight. Tap 'Start 5s Countdown', hold the device steady as verbally guided, and wait for the shutter click. The tool automatically computes the vertical depth and recommended table rating depth adjustments for Scratch/Bogey (Men & Women) players."
+  },
+  {
     title: "Sensor Diagnostics",
     color: "text-rose-700",
     icon: <Cpu className="text-rose-700" />,
